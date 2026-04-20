@@ -1,0 +1,78 @@
+# ══════════════════════════════════════════
+# CAD-ENGINE .gitignore
+# C++17 / Qt6 / OpenCASCADE
+# ══════════════════════════════════════════
+
+# Build
+build/
+build-*/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# Qt generated
+moc_*.cpp
+*.moc
+ui_*.h
+qrc_*.cpp
+.qmake.stash
+*.pro.user
+*.qbs.user
+
+# Compiled objects & binaries
+*.o
+*.obj
+*.exe
+*.dll
+*.so
+*.so.*
+*.dylib
+*.a
+*.lib
+*.pdb
+*.exp
+*.ilk
+cad-engine
+cam-engine
+
+# Packages & archives
+*.AppImage
+*.tar.gz
+*.tar.bz2
+*.zip
+*.deb
+*.rpm
+AppDir/
+
+# IDE
+.vscode/
+.idea/
+*.user
+*.swp
+*.swo
+*~
+.cache/
+.ccls-cache/
+.clangd/
+*.kate-swp
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+*.tmp
+
+# OpenCASCADE build artifacts
+*.brep
+*.iges
+*.step.bak
+
+# Test outputs
+*.stl.bak
+test_output/
+
+# Fichiers de sauvegarde CAD-ENGINE
+*.cadengine.bak

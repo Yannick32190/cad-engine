@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=CAD-ENGINE
+GenericName=3D CAD Modeler
+Comment=Parametric 3D CAD modeling application
+Exec=cad-engine
+Icon=cad-engine
+Terminal=false
+Categories=Graphics;3DGraphics;Engineering;
+MimeType=application/x-step;application/x-iges;
+Keywords=CAD;3D;modeling;parametric;sketch;extrude;
