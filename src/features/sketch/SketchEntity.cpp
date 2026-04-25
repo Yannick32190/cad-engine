@@ -1,6 +1,9 @@
 #include "SketchEntity.h"
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
+#include <BRepBuilderAPI_MakePolygon.hxx>
+#include <BRep_Builder.hxx>
+#include <TopoDS_Vertex.hxx>
 #include <GC_MakeArcOfCircle.hxx>
 #include <GC_MakeCircle.hxx>
 #include <GC_MakeSegment.hxx>
@@ -12,6 +15,8 @@
 #include <TColgp_Array1OfPnt.hxx>
 #include <TColStd_Array1OfReal.hxx>
 #include <TColStd_Array1OfInteger.hxx>
+#include <TopExp_Explorer.hxx>
+#include <TopoDS.hxx>
 #include <cmath>
 
 namespace CADEngine {
@@ -265,21 +270,20 @@ std::vector<TopoDS_Edge> SketchRectangle::toEdges3D(const gp_Pln& plane) const {
         gp_Vec yVec(plane.Position().YDirection());
         return origin.Translated(xVec.Multiplied(pt2D.X()) + yVec.Multiplied(pt2D.Y()));
     };
-    
+
     auto corners = getKeyPoints();
+
+    // Créer des vertices PARTAGÉS topologiquement entre arêtes adjacentes
+    // pour éviter les problèmes d'orientation aux coins lors de l'extrusion.
+    BRep_Builder bb;
+    TopoDS_Vertex v[4];
+    for (int i = 0; i < 4; i++)
+        bb.MakeVertex(v[i], toGlobal(corners[i]), Precision::Confusion());
+
     std::vector<TopoDS_Edge> edges;
-    
-    for (size_t i = 0; i < corners.size(); ++i) {
-        gp_Pnt start3D = toGlobal(corners[i]);
-        gp_Pnt end3D = toGlobal(corners[(i + 1) % corners.size()]);
-        
-        if (start3D.Distance(end3D) < 1e-6) continue;
-        
-        GC_MakeSegment segMaker(start3D, end3D);
-        if (segMaker.IsDone()) {
-            BRepBuilderAPI_MakeEdge edgeMaker(segMaker.Value());
-            if (edgeMaker.IsDone()) edges.push_back(edgeMaker.Edge());
-        }
+    for (int i = 0; i < 4; i++) {
+        BRepBuilderAPI_MakeEdge em(v[i], v[(i + 1) % 4]);
+        if (em.IsDone()) edges.push_back(em.Edge());
     }
     return edges;
 }
@@ -486,22 +490,19 @@ std::vector<TopoDS_Edge> SketchPolygon::toEdges3D(const gp_Pln& plane) const {
         gp_Vec yVec(plane.Position().YDirection());
         return origin.Translated(xVec.Multiplied(pt2D.X()) + yVec.Multiplied(pt2D.Y()));
     };
-    
+
     auto verts = getVertices();
     if (verts.size() < 3) return {};
-    
+
+    BRep_Builder bb;
+    std::vector<TopoDS_Vertex> tv(verts.size());
+    for (size_t i = 0; i < verts.size(); i++)
+        bb.MakeVertex(tv[i], toGlobal(verts[i]), Precision::Confusion());
+
     std::vector<TopoDS_Edge> edges;
-    for (size_t i = 0; i < verts.size(); ++i) {
-        gp_Pnt p1 = toGlobal(verts[i]);
-        gp_Pnt p2 = toGlobal(verts[(i + 1) % verts.size()]);
-        
-        if (p1.Distance(p2) < 1e-6) continue;
-        
-        GC_MakeSegment segMaker(p1, p2);
-        if (segMaker.IsDone()) {
-            BRepBuilderAPI_MakeEdge edgeMaker(segMaker.Value());
-            if (edgeMaker.IsDone()) edges.push_back(edgeMaker.Edge());
-        }
+    for (size_t i = 0; i < verts.size(); i++) {
+        BRepBuilderAPI_MakeEdge em(tv[i], tv[(i + 1) % verts.size()]);
+        if (em.IsDone()) edges.push_back(em.Edge());
     }
     return edges;
 }
