@@ -55,6 +55,7 @@ public:
     
     bool removeFeature(int featureId);
     bool removeFeature(const std::string& name);
+    bool renameFeature(int featureId, const std::string& newName);
     
     std::shared_ptr<Feature> getFeature(int id) const;
     std::shared_ptr<Feature> getFeature(const std::string& name) const;

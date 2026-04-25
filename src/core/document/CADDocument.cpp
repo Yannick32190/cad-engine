@@ -67,6 +67,18 @@ bool CADDocument::removeFeature(int featureId) {
     return true;
 }
 
+bool CADDocument::renameFeature(int featureId, const std::string& newName) {
+    auto it = m_featureById.find(featureId);
+    if (it == m_featureById.end()) return false;
+
+    auto feature = it->second;
+    m_featureByName.erase(feature->getName());
+    feature->setName(newName);
+    m_featureByName[newName] = feature;
+    m_modified = true;
+    return true;
+}
+
 bool CADDocument::removeFeature(const std::string& name) {
     auto it = m_featureByName.find(name);
     if (it == m_featureByName.end()) {

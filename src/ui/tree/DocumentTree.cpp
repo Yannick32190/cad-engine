@@ -10,6 +10,7 @@
 #include <QDebug>
 #include <QPropertyAnimation>
 #include <QApplication>
+#include <QInputDialog>
 
 DocumentTree::DocumentTree(QWidget* parent)
     : QWidget(parent)
@@ -291,8 +292,14 @@ void DocumentTree::onContextMenu(const QPoint& pos) {
         emit deleteFeatureRequested(feature);
     }
     else if (selected == actRename) {
-        // TODO: Dialog de renommage
-        qDebug() << "[DocumentTree] Renommage demandé";
+        QString currentName = QString::fromStdString(feature->getName());
+        bool ok = false;
+        QString newName = QInputDialog::getText(this, "Renommer",
+            "Nouveau nom :", QLineEdit::Normal, currentName, &ok);
+        if (ok && !newName.trimmed().isEmpty() && newName != currentName) {
+            m_document->renameFeature(feature->getId(), newName.trimmed().toStdString());
+            refresh();
+        }
     }
     else if (actExportDXF && selected == actExportDXF) {
         qDebug() << "[DocumentTree] Export DXF demandé pour sketch:" << QString::fromStdString(feature->getName());
