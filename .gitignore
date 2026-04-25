@@ -1,16 +1,10 @@
 # Build output
 out/
 *.o
-*.a
-*.so
-*.dll
-*.exe
+*.obj
 
-# CMake
-CMakeCache.txt
+# CMake (fichiers intermédiaires)
 CMakeFiles/
-cmake_install.cmake
-Makefile
 _autogen/
 
 # IDE
