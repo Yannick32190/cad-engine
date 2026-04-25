@@ -1,8 +1,6 @@
 #include "ExtrudeFeature.h"
 
 #include <BRepPrimAPI_MakePrism.hxx>
-#include <BRepLib.hxx>
-#include <ShapeFix_Solid.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepAlgoAPI_Fuse.hxx>
@@ -196,23 +194,13 @@ TopoDS_Shape ExtrudeFeature::buildExtrudeShape() const {
     double dist2 = getDistance2();
     ExtrudeDirection dir = getDirection();
     
-    // Normalise les normales sortantes du solide après extrusion
-    auto fixSolid = [](TopoDS_Shape s) -> TopoDS_Shape {
-        try {
-            ShapeFix_Solid fixer;
-            fixer.Init(TopoDS::Solid(s));
-            fixer.Perform();
-            return fixer.Solid();
-        } catch (...) { return s; }
-    };
-
     try {
         if (dir == ExtrudeDirection::OneSide) {
             gp_Vec vec(normal);
             vec.Scale(dist1);
             BRepPrimAPI_MakePrism prism(face, vec);
             prism.Build();
-            if (prism.IsDone()) return fixSolid(prism.Shape());
+            if (prism.IsDone()) return prism.Shape();
         }
         else if (dir == ExtrudeDirection::Symmetric) {
             double halfDist = dist1 / 2.0;
@@ -223,7 +211,7 @@ TopoDS_Shape ExtrudeFeature::buildExtrudeShape() const {
             TopoDS_Face movedFace = TopoDS::Face(face.Moved(TopLoc_Location(trsf)));
             BRepPrimAPI_MakePrism prism(movedFace, vecFull);
             prism.Build();
-            if (prism.IsDone()) return fixSolid(prism.Shape());
+            if (prism.IsDone()) return prism.Shape();
         }
         else if (dir == ExtrudeDirection::TwoSides) {
             gp_Vec vec1(normal); vec1.Scale(dist1);
@@ -235,10 +223,10 @@ TopoDS_Shape ExtrudeFeature::buildExtrudeShape() const {
             if (prism1.IsDone() && prism2.IsDone()) {
                 BRepAlgoAPI_Fuse fuse(prism1.Shape(), prism2.Shape());
                 fuse.Build();
-                if (fuse.IsDone()) return fixSolid(fuse.Shape());
-                return fixSolid(prism1.Shape());
+                if (fuse.IsDone()) return fuse.Shape();
+                return prism1.Shape();
             }
-            else if (prism1.IsDone()) return fixSolid(prism1.Shape());
+            else if (prism1.IsDone()) return prism1.Shape();
         }
     } catch (const Standard_Failure& e) {
         std::cerr << "[ExtrudeFeature] OCCT error: " << e.GetMessageString() << std::endl;
