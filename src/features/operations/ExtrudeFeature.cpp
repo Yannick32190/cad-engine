@@ -1,6 +1,8 @@
 #include "ExtrudeFeature.h"
 
 #include <BRepPrimAPI_MakePrism.hxx>
+#include <BRepLib.hxx>
+#include <ShapeFix_Solid.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepAlgoAPI_Fuse.hxx>
@@ -194,65 +196,49 @@ TopoDS_Shape ExtrudeFeature::buildExtrudeShape() const {
     double dist2 = getDistance2();
     ExtrudeDirection dir = getDirection();
     
+    // Normalise les normales sortantes du solide après extrusion
+    auto fixSolid = [](TopoDS_Shape s) -> TopoDS_Shape {
+        try {
+            ShapeFix_Solid fixer;
+            fixer.Init(TopoDS::Solid(s));
+            fixer.Perform();
+            return fixer.Solid();
+        } catch (...) { return s; }
+    };
+
     try {
         if (dir == ExtrudeDirection::OneSide) {
-            // Extrusion dans un seul sens
             gp_Vec vec(normal);
             vec.Scale(dist1);
-            
             BRepPrimAPI_MakePrism prism(face, vec);
             prism.Build();
-            if (prism.IsDone()) {
-                return prism.Shape();
-            }
+            if (prism.IsDone()) return fixSolid(prism.Shape());
         }
         else if (dir == ExtrudeDirection::Symmetric) {
-            // Symétrique : dist1/2 de chaque côté
             double halfDist = dist1 / 2.0;
-            
-            // D'abord déplacer la face de -halfDist
-            gp_Vec vecNeg(normal);
-            vecNeg.Scale(-halfDist);
-            gp_Vec vecFull(normal);
-            vecFull.Scale(dist1);
-            
-            // Translater la face vers le bas
+            gp_Vec vecNeg(normal); vecNeg.Scale(-halfDist);
+            gp_Vec vecFull(normal); vecFull.Scale(dist1);
             gp_Trsf trsf;
             trsf.SetTranslation(vecNeg);
             TopoDS_Face movedFace = TopoDS::Face(face.Moved(TopLoc_Location(trsf)));
-            
             BRepPrimAPI_MakePrism prism(movedFace, vecFull);
             prism.Build();
-            if (prism.IsDone()) {
-                return prism.Shape();
-            }
+            if (prism.IsDone()) return fixSolid(prism.Shape());
         }
         else if (dir == ExtrudeDirection::TwoSides) {
-            // Deux distances différentes
-            gp_Vec vec1(normal);
-            vec1.Scale(dist1);
-            gp_Vec vec2(normal);
-            vec2.Scale(-dist2);
-            
+            gp_Vec vec1(normal); vec1.Scale(dist1);
+            gp_Vec vec2(normal); vec2.Scale(-dist2);
             BRepPrimAPI_MakePrism prism1(face, vec1);
             prism1.Build();
-            
             BRepPrimAPI_MakePrism prism2(face, vec2);
             prism2.Build();
-            
             if (prism1.IsDone() && prism2.IsDone()) {
-                // Fusionner les deux moitiés
                 BRepAlgoAPI_Fuse fuse(prism1.Shape(), prism2.Shape());
                 fuse.Build();
-                if (fuse.IsDone()) {
-                    return fuse.Shape();
-                }
-                // Fallback: retourner côté 1 seul
-                return prism1.Shape();
+                if (fuse.IsDone()) return fixSolid(fuse.Shape());
+                return fixSolid(prism1.Shape());
             }
-            else if (prism1.IsDone()) {
-                return prism1.Shape();
-            }
+            else if (prism1.IsDone()) return fixSolid(prism1.Shape());
         }
     } catch (const Standard_Failure& e) {
         std::cerr << "[ExtrudeFeature] OCCT error: " << e.GetMessageString() << std::endl;
