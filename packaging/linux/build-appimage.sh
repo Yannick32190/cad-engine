@@ -103,18 +103,15 @@ occt_count=0
 for lib in "${OCCT_LIBS[@]}"; do
     src="$OCCT_LIB_DIR/lib${lib}.so"
     if [ -f "$src" ]; then
-        # Copy the actual file, not the symlink
         real=$(readlink -f "$src")
         cp "$real" "$APPDIR/usr/lib/"
-        # Create symlinks
         basename_real=$(basename "$real")
         ln -sf "$basename_real" "$APPDIR/usr/lib/lib${lib}.so"
-        # Also create .so.7 symlink if needed
         if [[ "$basename_real" == *".so."* ]]; then
             major_so="lib${lib}.so.$(echo $basename_real | grep -oP '\.so\.\K[0-9]+')"
             ln -sf "$basename_real" "$APPDIR/usr/lib/$major_so" 2>/dev/null || true
         fi
-        ((occt_count++))
+        occt_count=$((occt_count + 1))
     fi
 done
 
@@ -161,7 +158,7 @@ for lib in "${QT6_LIBS[@]}"; do
         basename_real=$(basename "$real")
         base="${lib%.so}"
         ln -sf "$basename_real" "$APPDIR/usr/lib/${lib}" 2>/dev/null || true
-        ((qt_count++))
+        qt_count=$((qt_count + 1))
     fi
 done
 
@@ -194,7 +191,9 @@ for dep in $(ldd "$APPDIR/usr/bin/cad-engine" | grep "=> /" | awk '{print $3}');
     esac
     
     if [ ! -f "$APPDIR/usr/lib/$basename_dep" ]; then
-        cp -L "$dep" "$APPDIR/usr/lib/" 2>/dev/null && ((sys_count++)) || true
+        if cp -L "$dep" "$APPDIR/usr/lib/" 2>/dev/null; then
+            sys_count=$((sys_count + 1))
+        fi
     fi
 done
 
