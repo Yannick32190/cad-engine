@@ -6460,12 +6460,16 @@ void MainWindow::onLinearPattern() {
         if (cham && cham->isValid()) { prevBody = cham->getResultShape(); bodyBefore = TopoDS_Shape(); featureShape = TopoDS_Shape(); continue; }
         auto sh = std::dynamic_pointer_cast<CADEngine::ShellFeature>(f);
         if (sh && sh->isValid()) { prevBody = sh->getResultShape(); bodyBefore = TopoDS_Shape(); featureShape = TopoDS_Shape(); continue; }
+        auto lp = std::dynamic_pointer_cast<CADEngine::LinearPatternFeature>(f);
+        if (lp && lp->isValid()) { prevBody = lp->getResultShape(); bodyBefore = TopoDS_Shape(); featureShape = TopoDS_Shape(); continue; }
+        auto cp = std::dynamic_pointer_cast<CADEngine::CircularPatternFeature>(f);
+        if (cp && cp->isValid()) { prevBody = cp->getResultShape(); bodyBefore = TopoDS_Shape(); featureShape = TopoDS_Shape(); continue; }
     }
-    
+
     TopoDS_Shape previewShape = !featureShape.IsNull() ? featureShape : body;
     bool isCut = (featureOp == 2);
     bool hasFeatureSep = !featureShape.IsNull();
-    
+
     QDialog dlg(this);
     dlg.setWindowTitle("Réseau linéaire");
     dlg.setMinimumWidth(380);
@@ -6674,11 +6678,15 @@ void MainWindow::onCircularPattern() {
         if (cham && cham->isValid()) { prevBody = cham->getResultShape(); bodyBefore = TopoDS_Shape(); featureShape = TopoDS_Shape(); continue; }
         auto sh = std::dynamic_pointer_cast<CADEngine::ShellFeature>(f);
         if (sh && sh->isValid()) { prevBody = sh->getResultShape(); bodyBefore = TopoDS_Shape(); featureShape = TopoDS_Shape(); continue; }
+        auto lp = std::dynamic_pointer_cast<CADEngine::LinearPatternFeature>(f);
+        if (lp && lp->isValid()) { prevBody = lp->getResultShape(); bodyBefore = TopoDS_Shape(); featureShape = TopoDS_Shape(); continue; }
+        auto cp = std::dynamic_pointer_cast<CADEngine::CircularPatternFeature>(f);
+        if (cp && cp->isValid()) { prevBody = cp->getResultShape(); bodyBefore = TopoDS_Shape(); featureShape = TopoDS_Shape(); continue; }
     }
-    
+
     TopoDS_Shape previewShape = !featureShape.IsNull() ? featureShape : body;
     bool isCut = (featureOp == 2);
-    
+
     QDialog dlg(this);
     dlg.setWindowTitle("Réseau circulaire");
     dlg.setMinimumWidth(350);
