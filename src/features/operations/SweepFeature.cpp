@@ -6,11 +6,10 @@
 #include <BRepAlgoAPI_Fuse.hxx>
 #include <BRepAlgoAPI_Cut.hxx>
 #include <BRepAlgoAPI_Common.hxx>
-#include <ShapeAnalysis_FreeBounds.hxx>
-#include <TopTools_HSequenceOfShape.hxx>
 #include <TopExp_Explorer.hxx>
 #include <TopoDS.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
+#include <gp_Dir.hxx>
 
 #include <iostream>
 
@@ -56,11 +55,13 @@ ExtrudeOperation SweepFeature::getOperation() const {
 TopoDS_Face SweepFeature::buildProfileFace() const {
     if (!m_profileFace.IsNull()) return m_profileFace;
     if (!m_profileSketch || !m_profileSketch->getSketch2D()) return TopoDS_Face();
-    
+
     auto sketch2D = m_profileSketch->getSketch2D();
     auto regions = sketch2D->buildFaceRegions();
-    if (regions.empty()) return TopoDS_Face();
-    
+    if (regions.empty()) {
+        std::cerr << "[Sweep] Profile sketch has no closed region" << std::endl;
+        return TopoDS_Face();
+    }
     return regions[0].face;
 }
 
@@ -76,7 +77,8 @@ TopoDS_Wire SweepFeature::buildPathWire() const {
     int edgeCount = 0;
 
     for (const auto& entity : entities) {
-        if (!entity || !entity->isValid()) continue;
+        // Ignorer les entités de construction (axes, lignes d'aide)
+        if (!entity || !entity->isValid() || entity->isConstruction()) continue;
         auto edges = entity->toEdges3D(plane);
         for (const auto& edge : edges) {
             if (!edge.IsNull()) {
@@ -86,11 +88,21 @@ TopoDS_Wire SweepFeature::buildPathWire() const {
         }
     }
 
-    std::cout << "[Sweep] Path wire: " << edgeCount << " edge(s) added" << std::endl;
+    std::cout << "[Sweep] Path wire: " << edgeCount << " real edge(s) added" << std::endl;
 
-    if (edgeCount == 0 || !wireBuilder.IsDone()) {
-        std::cerr << "[Sweep] ERROR: Path wire construction failed (edges=" << edgeCount
-                  << ", done=" << wireBuilder.IsDone() << ")" << std::endl;
+    if (edgeCount == 0) {
+        std::cerr << "[Sweep] ERROR: Path sketch has no usable entities (only construction lines?)" << std::endl;
+        return TopoDS_Wire();
+    }
+    if (!wireBuilder.IsDone()) {
+        // Donner un message d'erreur précis selon le code d'erreur
+        auto err = wireBuilder.Error();
+        if (err == BRepBuilderAPI_DisconnectedWire)
+            std::cerr << "[Sweep] ERROR: Path wire is disconnected — entities must be connected end-to-end" << std::endl;
+        else if (err == BRepBuilderAPI_NonManifoldWire)
+            std::cerr << "[Sweep] ERROR: Path wire is non-manifold" << std::endl;
+        else
+            std::cerr << "[Sweep] ERROR: Path wire build failed (code=" << err << ")" << std::endl;
         return TopoDS_Wire();
     }
     return wireBuilder.Wire();
@@ -98,31 +110,44 @@ TopoDS_Wire SweepFeature::buildPathWire() const {
 
 bool SweepFeature::compute() {
     std::cout << "[Sweep] Computing..." << std::endl;
-    
+
     TopoDS_Face profile = buildProfileFace();
     if (profile.IsNull()) {
-        std::cerr << "[Sweep] ERROR: No profile face" << std::endl;
+        std::cerr << "[Sweep] ERROR: No profile face — profile sketch must be a closed shape" << std::endl;
         return false;
     }
-    
+
     TopoDS_Wire path = buildPathWire();
     if (path.IsNull()) {
         std::cerr << "[Sweep] ERROR: No path wire" << std::endl;
         return false;
     }
-    
+
+    // Vérifier que profil et chemin ne sont pas sur le même plan (pipe dégénéré)
+    if (m_profileSketch && m_pathSketch &&
+        m_profileSketch->getSketch2D() && m_pathSketch->getSketch2D())
+    {
+        gp_Dir profileNormal = m_profileSketch->getSketch2D()->getPlane().Axis().Direction();
+        gp_Dir pathNormal    = m_pathSketch->getSketch2D()->getPlane().Axis().Direction();
+        if (profileNormal.IsParallel(pathNormal, 0.01)) {
+            std::cerr << "[Sweep] ERROR: Profile and path sketches are on parallel planes — "
+                         "use perpendicular planes (e.g. profile on XY, path on XZ)" << std::endl;
+            return false;
+        }
+    }
+
     try {
         BRepOffsetAPI_MakePipe pipe(path, profile);
         pipe.Build();
-        
+
         if (!pipe.IsDone()) {
-            std::cerr << "[Sweep] ERROR: MakePipe failed" << std::endl;
+            std::cerr << "[Sweep] ERROR: MakePipe failed — check that path is continuous "
+                         "and profile is at path start" << std::endl;
             return false;
         }
-        
+
         TopoDS_Shape sweepShape = pipe.Shape();
-        
-        // Appliquer opération booléenne
+
         ExtrudeOperation op = getOperation();
         if (op == ExtrudeOperation::NewBody || m_existingBody.IsNull()) {
             m_resultShape = sweepShape;
@@ -140,11 +165,11 @@ bool SweepFeature::compute() {
             if (common.IsDone()) { m_resultShape = common.Shape(); m_shape = m_resultShape; }
             else return false;
         }
-        
+
         m_upToDate = true;
         std::cout << "[Sweep] Success" << std::endl;
         return true;
-        
+
     } catch (Standard_Failure& e) {
         std::cerr << "[Sweep] OCCT Exception: " << e.GetMessageString() << std::endl;
         return false;

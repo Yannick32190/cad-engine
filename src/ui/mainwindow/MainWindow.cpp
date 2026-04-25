@@ -6334,7 +6334,13 @@ void MainWindow::onSweep() {
         onStatusMessage("Balayage créé");
     } else {
         m_document->removeFeature(sweep->getId());
-        QMessageBox::warning(this, "Erreur Balayage", "Le balayage a échoué.\nVérifiez que le profil est fermé et le chemin valide.");
+        QMessageBox::warning(this, "Erreur Balayage",
+            "Le balayage a échoué.\n\n"
+            "Vérifiez :\n"
+            "• Le profil doit être une forme fermée (cercle, rectangle…)\n"
+            "• Le chemin doit être continu (entités connectées bout à bout)\n"
+            "• Profil et chemin doivent être sur des plans perpendiculaires\n"
+            "  (ex : profil sur XY, chemin sur XZ ou YZ)");
     }
 }
 
