@@ -13,6 +13,16 @@ option(BUILD_EXAMPLES "Build examples" ON)
 option(PORTABLE_BUILD "Build portable package" OFF)
 
 # ============================================================================
+# Portable build: embed RPATH so the binary finds bundled libs at runtime
+# ============================================================================
+if(PORTABLE_BUILD AND UNIX AND NOT APPLE)
+    set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
+    set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib:$ORIGIN/lib")
+    set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
+    message(STATUS "RPATH set to \$ORIGIN/../lib:\$ORIGIN/lib for portable packaging")
+endif()
+
+# ============================================================================
 # Find Qt6
 # ============================================================================
 find_package(Qt6 REQUIRED COMPONENTS Core Widgets OpenGL OpenGLWidgets PrintSupport)
