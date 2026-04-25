@@ -66,6 +66,16 @@ template <> constexpr inline auto Viewport3D::qt_create_metaobjectdata<qt_meta_t
         "std::shared_ptr<CADEngine::SketchPolyline>",
         "polyline",
         "vertexIndex",
+        "filletRectCornerRequested",
+        "std::shared_ptr<CADEngine::SketchRectangle>",
+        "rect",
+        "cornerIdx",
+        "filletLineCornerRequested",
+        "std::shared_ptr<CADEngine::SketchLine>",
+        "line1",
+        "line1AtStart",
+        "line2",
+        "line2AtStart",
         "faceClicked",
         "TopoDS_Face",
         "face",
@@ -123,34 +133,42 @@ template <> constexpr inline auto Viewport3D::qt_create_metaobjectdata<qt_meta_t
         QtMocHelpers::SignalData<void(std::shared_ptr<CADEngine::SketchPolyline>, int)>(24, 2, QMC::AccessPublic, QMetaType::Void, {{
             { 0x80000000 | 25, 26 }, { QMetaType::Int, 27 },
         }}),
+        // Signal 'filletRectCornerRequested'
+        QtMocHelpers::SignalData<void(std::shared_ptr<CADEngine::SketchRectangle>, int)>(28, 2, QMC::AccessPublic, QMetaType::Void, {{
+            { 0x80000000 | 29, 30 }, { QMetaType::Int, 31 },
+        }}),
+        // Signal 'filletLineCornerRequested'
+        QtMocHelpers::SignalData<void(std::shared_ptr<CADEngine::SketchLine>, bool, std::shared_ptr<CADEngine::SketchLine>, bool)>(32, 2, QMC::AccessPublic, QMetaType::Void, {{
+            { 0x80000000 | 33, 34 }, { QMetaType::Bool, 35 }, { 0x80000000 | 33, 36 }, { QMetaType::Bool, 37 },
+        }}),
         // Signal 'faceClicked'
-        QtMocHelpers::SignalData<void(TopoDS_Face)>(28, 2, QMC::AccessPublic, QMetaType::Void, {{
-            { 0x80000000 | 29, 30 },
+        QtMocHelpers::SignalData<void(TopoDS_Face)>(38, 2, QMC::AccessPublic, QMetaType::Void, {{
+            { 0x80000000 | 39, 40 },
         }}),
         // Signal 'faceSelected'
-        QtMocHelpers::SignalData<void(TopoDS_Face)>(31, 2, QMC::AccessPublic, QMetaType::Void, {{
-            { 0x80000000 | 29, 30 },
+        QtMocHelpers::SignalData<void(TopoDS_Face)>(41, 2, QMC::AccessPublic, QMetaType::Void, {{
+            { 0x80000000 | 39, 40 },
         }}),
         // Signal 'faceSelectionCancelled'
-        QtMocHelpers::SignalData<void()>(32, 2, QMC::AccessPublic, QMetaType::Void),
+        QtMocHelpers::SignalData<void()>(42, 2, QMC::AccessPublic, QMetaType::Void),
         // Signal 'edgeSelected'
-        QtMocHelpers::SignalData<void(TopoDS_Edge)>(33, 2, QMC::AccessPublic, QMetaType::Void, {{
-            { 0x80000000 | 34, 35 },
+        QtMocHelpers::SignalData<void(TopoDS_Edge)>(43, 2, QMC::AccessPublic, QMetaType::Void, {{
+            { 0x80000000 | 44, 45 },
         }}),
         // Signal 'edgeSelectionConfirmed'
-        QtMocHelpers::SignalData<void()>(36, 2, QMC::AccessPublic, QMetaType::Void),
+        QtMocHelpers::SignalData<void()>(46, 2, QMC::AccessPublic, QMetaType::Void),
         // Signal 'edgeSelectionCancelled'
-        QtMocHelpers::SignalData<void()>(37, 2, QMC::AccessPublic, QMetaType::Void),
+        QtMocHelpers::SignalData<void()>(47, 2, QMC::AccessPublic, QMetaType::Void),
         // Signal 'profileSelected'
-        QtMocHelpers::SignalData<void(TopoDS_Face, QString)>(38, 2, QMC::AccessPublic, QMetaType::Void, {{
-            { 0x80000000 | 29, 30 }, { QMetaType::QString, 39 },
+        QtMocHelpers::SignalData<void(TopoDS_Face, QString)>(48, 2, QMC::AccessPublic, QMetaType::Void, {{
+            { 0x80000000 | 39, 40 }, { QMetaType::QString, 49 },
         }}),
         // Signal 'multiProfileSelected'
-        QtMocHelpers::SignalData<void(std::vector<TopoDS_Face>, QString)>(40, 2, QMC::AccessPublic, QMetaType::Void, {{
-            { 0x80000000 | 41, 42 }, { QMetaType::QString, 39 },
+        QtMocHelpers::SignalData<void(std::vector<TopoDS_Face>, QString)>(50, 2, QMC::AccessPublic, QMetaType::Void, {{
+            { 0x80000000 | 51, 52 }, { QMetaType::QString, 49 },
         }}),
         // Signal 'profileSelectionCancelled'
-        QtMocHelpers::SignalData<void()>(43, 2, QMC::AccessPublic, QMetaType::Void),
+        QtMocHelpers::SignalData<void()>(53, 2, QMC::AccessPublic, QMetaType::Void),
     };
     QtMocHelpers::UintData qt_properties {
     };
@@ -184,15 +202,17 @@ void Viewport3D::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, 
         case 7: _t->entityRightClicked((*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::SketchEntity>>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<QPoint>>(_a[2]))); break;
         case 8: _t->dimensionRightClicked((*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::Dimension>>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<QPoint>>(_a[2]))); break;
         case 9: _t->filletRequested((*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::SketchPolyline>>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<int>>(_a[2]))); break;
-        case 10: _t->faceClicked((*reinterpret_cast<std::add_pointer_t<TopoDS_Face>>(_a[1]))); break;
-        case 11: _t->faceSelected((*reinterpret_cast<std::add_pointer_t<TopoDS_Face>>(_a[1]))); break;
-        case 12: _t->faceSelectionCancelled(); break;
-        case 13: _t->edgeSelected((*reinterpret_cast<std::add_pointer_t<TopoDS_Edge>>(_a[1]))); break;
-        case 14: _t->edgeSelectionConfirmed(); break;
-        case 15: _t->edgeSelectionCancelled(); break;
-        case 16: _t->profileSelected((*reinterpret_cast<std::add_pointer_t<TopoDS_Face>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<QString>>(_a[2]))); break;
-        case 17: _t->multiProfileSelected((*reinterpret_cast<std::add_pointer_t<std::vector<TopoDS_Face>>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<QString>>(_a[2]))); break;
-        case 18: _t->profileSelectionCancelled(); break;
+        case 10: _t->filletRectCornerRequested((*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::SketchRectangle>>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<int>>(_a[2]))); break;
+        case 11: _t->filletLineCornerRequested((*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::SketchLine>>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<bool>>(_a[2])),(*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::SketchLine>>>(_a[3])),(*reinterpret_cast<std::add_pointer_t<bool>>(_a[4]))); break;
+        case 12: _t->faceClicked((*reinterpret_cast<std::add_pointer_t<TopoDS_Face>>(_a[1]))); break;
+        case 13: _t->faceSelected((*reinterpret_cast<std::add_pointer_t<TopoDS_Face>>(_a[1]))); break;
+        case 14: _t->faceSelectionCancelled(); break;
+        case 15: _t->edgeSelected((*reinterpret_cast<std::add_pointer_t<TopoDS_Edge>>(_a[1]))); break;
+        case 16: _t->edgeSelectionConfirmed(); break;
+        case 17: _t->edgeSelectionCancelled(); break;
+        case 18: _t->profileSelected((*reinterpret_cast<std::add_pointer_t<TopoDS_Face>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<QString>>(_a[2]))); break;
+        case 19: _t->multiProfileSelected((*reinterpret_cast<std::add_pointer_t<std::vector<TopoDS_Face>>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<QString>>(_a[2]))); break;
+        case 20: _t->profileSelectionCancelled(); break;
         default: ;
         }
     }
@@ -217,23 +237,27 @@ void Viewport3D::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, 
             return;
         if (QtMocHelpers::indexOfMethod<void (Viewport3D::*)(std::shared_ptr<CADEngine::SketchPolyline> , int )>(_a, &Viewport3D::filletRequested, 9))
             return;
-        if (QtMocHelpers::indexOfMethod<void (Viewport3D::*)(TopoDS_Face )>(_a, &Viewport3D::faceClicked, 10))
+        if (QtMocHelpers::indexOfMethod<void (Viewport3D::*)(std::shared_ptr<CADEngine::SketchRectangle> , int )>(_a, &Viewport3D::filletRectCornerRequested, 10))
             return;
-        if (QtMocHelpers::indexOfMethod<void (Viewport3D::*)(TopoDS_Face )>(_a, &Viewport3D::faceSelected, 11))
+        if (QtMocHelpers::indexOfMethod<void (Viewport3D::*)(std::shared_ptr<CADEngine::SketchLine> , bool , std::shared_ptr<CADEngine::SketchLine> , bool )>(_a, &Viewport3D::filletLineCornerRequested, 11))
             return;
-        if (QtMocHelpers::indexOfMethod<void (Viewport3D::*)()>(_a, &Viewport3D::faceSelectionCancelled, 12))
+        if (QtMocHelpers::indexOfMethod<void (Viewport3D::*)(TopoDS_Face )>(_a, &Viewport3D::faceClicked, 12))
             return;
-        if (QtMocHelpers::indexOfMethod<void (Viewport3D::*)(TopoDS_Edge )>(_a, &Viewport3D::edgeSelected, 13))
+        if (QtMocHelpers::indexOfMethod<void (Viewport3D::*)(TopoDS_Face )>(_a, &Viewport3D::faceSelected, 13))
             return;
-        if (QtMocHelpers::indexOfMethod<void (Viewport3D::*)()>(_a, &Viewport3D::edgeSelectionConfirmed, 14))
+        if (QtMocHelpers::indexOfMethod<void (Viewport3D::*)()>(_a, &Viewport3D::faceSelectionCancelled, 14))
             return;
-        if (QtMocHelpers::indexOfMethod<void (Viewport3D::*)()>(_a, &Viewport3D::edgeSelectionCancelled, 15))
+        if (QtMocHelpers::indexOfMethod<void (Viewport3D::*)(TopoDS_Edge )>(_a, &Viewport3D::edgeSelected, 15))
             return;
-        if (QtMocHelpers::indexOfMethod<void (Viewport3D::*)(TopoDS_Face , QString )>(_a, &Viewport3D::profileSelected, 16))
+        if (QtMocHelpers::indexOfMethod<void (Viewport3D::*)()>(_a, &Viewport3D::edgeSelectionConfirmed, 16))
             return;
-        if (QtMocHelpers::indexOfMethod<void (Viewport3D::*)(std::vector<TopoDS_Face> , QString )>(_a, &Viewport3D::multiProfileSelected, 17))
+        if (QtMocHelpers::indexOfMethod<void (Viewport3D::*)()>(_a, &Viewport3D::edgeSelectionCancelled, 17))
             return;
-        if (QtMocHelpers::indexOfMethod<void (Viewport3D::*)()>(_a, &Viewport3D::profileSelectionCancelled, 18))
+        if (QtMocHelpers::indexOfMethod<void (Viewport3D::*)(TopoDS_Face , QString )>(_a, &Viewport3D::profileSelected, 18))
+            return;
+        if (QtMocHelpers::indexOfMethod<void (Viewport3D::*)(std::vector<TopoDS_Face> , QString )>(_a, &Viewport3D::multiProfileSelected, 19))
+            return;
+        if (QtMocHelpers::indexOfMethod<void (Viewport3D::*)()>(_a, &Viewport3D::profileSelectionCancelled, 20))
             return;
     }
 }
@@ -259,14 +283,14 @@ int Viewport3D::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        if (_id < 19)
+        if (_id < 21)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 19;
+        _id -= 21;
     }
     if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
-        if (_id < 19)
+        if (_id < 21)
             *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType();
-        _id -= 19;
+        _id -= 21;
     }
     return _id;
 }
@@ -332,56 +356,68 @@ void Viewport3D::filletRequested(std::shared_ptr<CADEngine::SketchPolyline> _t1,
 }
 
 // SIGNAL 10
-void Viewport3D::faceClicked(TopoDS_Face _t1)
+void Viewport3D::filletRectCornerRequested(std::shared_ptr<CADEngine::SketchRectangle> _t1, int _t2)
 {
-    QMetaObject::activate<void>(this, &staticMetaObject, 10, nullptr, _t1);
+    QMetaObject::activate<void>(this, &staticMetaObject, 10, nullptr, _t1, _t2);
 }
 
 // SIGNAL 11
-void Viewport3D::faceSelected(TopoDS_Face _t1)
+void Viewport3D::filletLineCornerRequested(std::shared_ptr<CADEngine::SketchLine> _t1, bool _t2, std::shared_ptr<CADEngine::SketchLine> _t3, bool _t4)
 {
-    QMetaObject::activate<void>(this, &staticMetaObject, 11, nullptr, _t1);
+    QMetaObject::activate<void>(this, &staticMetaObject, 11, nullptr, _t1, _t2, _t3, _t4);
 }
 
 // SIGNAL 12
-void Viewport3D::faceSelectionCancelled()
+void Viewport3D::faceClicked(TopoDS_Face _t1)
 {
-    QMetaObject::activate(this, &staticMetaObject, 12, nullptr);
+    QMetaObject::activate<void>(this, &staticMetaObject, 12, nullptr, _t1);
 }
 
 // SIGNAL 13
-void Viewport3D::edgeSelected(TopoDS_Edge _t1)
+void Viewport3D::faceSelected(TopoDS_Face _t1)
 {
     QMetaObject::activate<void>(this, &staticMetaObject, 13, nullptr, _t1);
 }
 
 // SIGNAL 14
-void Viewport3D::edgeSelectionConfirmed()
+void Viewport3D::faceSelectionCancelled()
 {
     QMetaObject::activate(this, &staticMetaObject, 14, nullptr);
 }
 
 // SIGNAL 15
-void Viewport3D::edgeSelectionCancelled()
+void Viewport3D::edgeSelected(TopoDS_Edge _t1)
 {
-    QMetaObject::activate(this, &staticMetaObject, 15, nullptr);
+    QMetaObject::activate<void>(this, &staticMetaObject, 15, nullptr, _t1);
 }
 
 // SIGNAL 16
-void Viewport3D::profileSelected(TopoDS_Face _t1, QString _t2)
+void Viewport3D::edgeSelectionConfirmed()
 {
-    QMetaObject::activate<void>(this, &staticMetaObject, 16, nullptr, _t1, _t2);
+    QMetaObject::activate(this, &staticMetaObject, 16, nullptr);
 }
 
 // SIGNAL 17
-void Viewport3D::multiProfileSelected(std::vector<TopoDS_Face> _t1, QString _t2)
+void Viewport3D::edgeSelectionCancelled()
 {
-    QMetaObject::activate<void>(this, &staticMetaObject, 17, nullptr, _t1, _t2);
+    QMetaObject::activate(this, &staticMetaObject, 17, nullptr);
 }
 
 // SIGNAL 18
+void Viewport3D::profileSelected(TopoDS_Face _t1, QString _t2)
+{
+    QMetaObject::activate<void>(this, &staticMetaObject, 18, nullptr, _t1, _t2);
+}
+
+// SIGNAL 19
+void Viewport3D::multiProfileSelected(std::vector<TopoDS_Face> _t1, QString _t2)
+{
+    QMetaObject::activate<void>(this, &staticMetaObject, 19, nullptr, _t1, _t2);
+}
+
+// SIGNAL 20
 void Viewport3D::profileSelectionCancelled()
 {
-    QMetaObject::activate(this, &staticMetaObject, 18, nullptr);
+    QMetaObject::activate(this, &staticMetaObject, 20, nullptr);
 }
 QT_WARNING_POP
