@@ -11,8 +11,6 @@
 #include <TopExp_Explorer.hxx>
 #include <TopoDS.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
-#include <GC_MakeSegment.hxx>
-#include <gp_Pnt.hxx>
 
 #include <iostream>
 
@@ -69,30 +67,32 @@ TopoDS_Face SweepFeature::buildProfileFace() const {
 TopoDS_Wire SweepFeature::buildPathWire() const {
     if (!m_pathWire.IsNull()) return m_pathWire;
     if (!m_pathSketch || !m_pathSketch->getSketch2D()) return TopoDS_Wire();
-    
+
     auto sketch2D = m_pathSketch->getSketch2D();
     auto entities = sketch2D->getEntities();
-    
-    // Construire un wire à partir de toutes les entités du sketch chemin
-    BRepBuilderAPI_MakeWire wireBuilder;
     gp_Pln plane = sketch2D->getPlane();
-    
+
+    BRepBuilderAPI_MakeWire wireBuilder;
+    int edgeCount = 0;
+
     for (const auto& entity : entities) {
-        auto line = std::dynamic_pointer_cast<SketchLine>(entity);
-        if (line) {
-            gp_Pnt p1 = plane.Location().XYZ() + 
-                         line->getStart().X() * gp_Vec(plane.XAxis().Direction()).XYZ() +
-                         line->getStart().Y() * gp_Vec(plane.YAxis().Direction()).XYZ();
-            gp_Pnt p2 = plane.Location().XYZ() + 
-                         line->getEnd().X() * gp_Vec(plane.XAxis().Direction()).XYZ() +
-                         line->getEnd().Y() * gp_Vec(plane.YAxis().Direction()).XYZ();
-            if (p1.Distance(p2) > 1e-6) {
-                wireBuilder.Add(BRepBuilderAPI_MakeEdge(p1, p2).Edge());
+        if (!entity || !entity->isValid()) continue;
+        auto edges = entity->toEdges3D(plane);
+        for (const auto& edge : edges) {
+            if (!edge.IsNull()) {
+                wireBuilder.Add(edge);
+                edgeCount++;
             }
         }
     }
-    
-    if (!wireBuilder.IsDone()) return TopoDS_Wire();
+
+    std::cout << "[Sweep] Path wire: " << edgeCount << " edge(s) added" << std::endl;
+
+    if (edgeCount == 0 || !wireBuilder.IsDone()) {
+        std::cerr << "[Sweep] ERROR: Path wire construction failed (edges=" << edgeCount
+                  << ", done=" << wireBuilder.IsDone() << ")" << std::endl;
+        return TopoDS_Wire();
+    }
     return wireBuilder.Wire();
 }
 
