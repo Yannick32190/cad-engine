@@ -63,16 +63,21 @@ $packages = @(
 )
 
 $missing = @()
+$prevEAP = $ErrorActionPreference
+$ErrorActionPreference = "SilentlyContinue"
 foreach ($pkg in $packages) {
     $null = & $PACMAN -Q $pkg 2>&1
     if ($LASTEXITCODE -ne 0) { $missing += $pkg }
 }
+$ErrorActionPreference = $prevEAP
 
 if ($missing.Count -gt 0) {
     Warn "Paquets manquants : $($missing -join ', ')"
-    Write-Host "    Installation en cours (peut prendre 10-20 min)..." -ForegroundColor Yellow
+    Write-Host "    Mise a jour de la base de donnees pacman..." -ForegroundColor Yellow
     & $PACMAN -Sy --noconfirm 2>&1 | Out-Null
+    Write-Host "    Installation en cours (peut prendre 10-20 min)..." -ForegroundColor Yellow
     & $PACMAN -S --noconfirm --needed @missing 2>&1 | Select-Object -Last 5
+    if ($LASTEXITCODE -ne 0) { Fail "Echec de l'installation des dependances" }
 }
 
 if (-not (Test-Path $CMAKE)) { Fail "cmake introuvable : $CMAKE" }
