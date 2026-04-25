@@ -1,0 +1,9 @@
+/media/yannick/8EE67CDCE67CC5CD/Users/yannick/Desktop/cad-engine-main/build/CMakeFiles/cad-engine.dir
+/media/yannick/8EE67CDCE67CC5CD/Users/yannick/Desktop/cad-engine-main/build/CMakeFiles/edit_cache.dir
+/media/yannick/8EE67CDCE67CC5CD/Users/yannick/Desktop/cad-engine-main/build/CMakeFiles/rebuild_cache.dir
+/media/yannick/8EE67CDCE67CC5CD/Users/yannick/Desktop/cad-engine-main/build/CMakeFiles/list_install_components.dir
+/media/yannick/8EE67CDCE67CC5CD/Users/yannick/Desktop/cad-engine-main/build/CMakeFiles/install.dir
+/media/yannick/8EE67CDCE67CC5CD/Users/yannick/Desktop/cad-engine-main/build/CMakeFiles/install/local.dir
+/media/yannick/8EE67CDCE67CC5CD/Users/yannick/Desktop/cad-engine-main/build/CMakeFiles/install/strip.dir
+/media/yannick/8EE67CDCE67CC5CD/Users/yannick/Desktop/cad-engine-main/build/CMakeFiles/cad-engine_autogen_timestamp_deps.dir
+/media/yannick/8EE67CDCE67CC5CD/Users/yannick/Desktop/cad-engine-main/build/CMakeFiles/cad-engine_autogen.dir
