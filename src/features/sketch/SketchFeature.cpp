@@ -95,9 +95,7 @@ void SketchFeature::setPlaneYZ(double x) {
 }
 
 void SketchFeature::setPlaneZX(double y) {
-    // xDir=(0,0,1) → yDir = normal × xDir = (0,1,0)×(0,0,1) = (1,0,0)
-    // Wire CCW vu depuis +Y : local x→Z+, local y→X+ → orientation correcte
-    gp_Ax3 ax3(gp_Pnt(0, y, 0), gp_Dir(0, 1, 0), gp_Dir(0, 0, 1));
+    gp_Ax3 ax3(gp_Pnt(0, y, 0), gp_Dir(0, 1, 0), gp_Dir(1, 0, 0));
     gp_Pln plane(ax3);
     setPlane(plane);
     setString("plane_type", "ZX");
