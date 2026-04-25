@@ -41,6 +41,7 @@ public:
 
 private:
     TopoDS_Face buildProfileFace() const;
+    TopoDS_Wire buildProfileWire() const;
     TopoDS_Wire buildPathWire() const;
     
     std::shared_ptr<SketchFeature> m_profileSketch;

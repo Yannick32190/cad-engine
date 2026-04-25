@@ -3,6 +3,10 @@ out/
 *.o
 *.obj
 
+# Dossiers de build temporaires
+build-fix/
+build-release/
+
 # CMake (fichiers intermédiaires)
 CMakeFiles/
 _autogen/

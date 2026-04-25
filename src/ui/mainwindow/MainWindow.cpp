@@ -179,6 +179,8 @@ MainWindow::MainWindow(QWidget* parent)
     
     // Connexion fillet
     connect(m_viewport, &Viewport3D::filletRequested, this, &MainWindow::onFilletVertex);
+    connect(m_viewport, &Viewport3D::filletRectCornerRequested, this, &MainWindow::onFilletRectCorner);
+    connect(m_viewport, &Viewport3D::filletLineCornerRequested, this, &MainWindow::onFilletLineCorner);
     connect(m_viewport, &Viewport3D::edgeSelectionConfirmed, this, [this]() {
         if (m_pendingEdgeOp == PendingEdgeOp::Fillet) {
             m_pendingEdgeOp = PendingEdgeOp::None;
@@ -3376,13 +3378,153 @@ void MainWindow::onFilletVertex(std::shared_ptr<CADEngine::SketchPolyline> polyl
     }
     
     polyline->setPoints(newPoints);
-    
-    // Rafraîchir
+
     refreshAllAngularDimensions();
     m_viewport->update();
     m_viewport->setSketchTool(SketchTool::None);
     m_statusLabel->setText(QString("Congé R%1 appliqué au vertex %2")
         .arg(radius, 0, 'f', 1).arg(vertexIndex));
+}
+
+// ============================================================================
+// Helper partagé : calcul géométrique du congé (P→V→Q)
+// Retourne false si le congé est impossible
+// ============================================================================
+static bool computeFilletGeometry(
+    const gp_Pnt2d& P, const gp_Pnt2d& V, const gp_Pnt2d& Q,
+    double radius,
+    gp_Pnt2d& T1, gp_Pnt2d& T2, gp_Pnt2d& arcMid)
+{
+    double dx1 = P.X()-V.X(), dy1 = P.Y()-V.Y();
+    double dx2 = Q.X()-V.X(), dy2 = Q.Y()-V.Y();
+    double len1 = std::sqrt(dx1*dx1+dy1*dy1);
+    double len2 = std::sqrt(dx2*dx2+dy2*dy2);
+    if (len1 < 1e-6 || len2 < 1e-6) return false;
+
+    double cosA = std::max(-1.0, std::min(1.0, (dx1*dx2+dy1*dy2)/(len1*len2)));
+    double half = std::acos(cosA) / 2.0;
+    if (half < 0.01 || half > M_PI/2.0 - 0.01) return false;
+
+    double trimDist = radius / std::tan(half);
+    T1 = gp_Pnt2d(V.X()+dx1/len1*trimDist, V.Y()+dy1/len1*trimDist);
+    T2 = gp_Pnt2d(V.X()+dx2/len2*trimDist, V.Y()+dy2/len2*trimDist);
+
+    double bisX = dx1/len1 + dx2/len2;
+    double bisY = dy1/len1 + dy2/len2;
+    double bisLen = std::sqrt(bisX*bisX+bisY*bisY);
+    if (bisLen < 1e-6) return false;
+
+    double centerDist = radius / std::sin(half);
+    // arcMid = point du cercle de congé le plus proche de V (sur la bissectrice)
+    arcMid = gp_Pnt2d(V.X() + bisX/bisLen*(centerDist-radius),
+                      V.Y() + bisY/bisLen*(centerDist-radius));
+    return true;
+}
+
+static double askFilletRadius(QWidget* parent, const gp_Pnt2d& P, const gp_Pnt2d& V, const gp_Pnt2d& Q)
+{
+    double dx1=P.X()-V.X(), dy1=P.Y()-V.Y(), dx2=Q.X()-V.X(), dy2=Q.Y()-V.Y();
+    double len1=std::sqrt(dx1*dx1+dy1*dy1), len2=std::sqrt(dx2*dx2+dy2*dy2);
+    if (len1<1e-6||len2<1e-6) return -1.0;
+    double cosA=std::max(-1.0,std::min(1.0,(dx1*dx2+dy1*dy2)/(len1*len2)));
+    double half=std::acos(cosA)/2.0;
+    if (half<0.01) return -1.0;
+    double maxR = std::min(len1,len2)*0.9*std::tan(half);
+    bool ok;
+    double r = QInputDialog::getDouble(parent, "Congé",
+        QString("Rayon du congé (max: %1 mm):").arg(maxR,0,'f',1),
+        std::min(5.0,maxR), 0.1, maxR, 2, &ok);
+    return ok ? r : -1.0;
+}
+
+// ============================================================================
+// Congé sur coin de rectangle
+// ============================================================================
+void MainWindow::onFilletRectCorner(std::shared_ptr<CADEngine::SketchRectangle> rect, int cornerIdx)
+{
+    auto sketch = m_viewport->getActiveSketch();
+    if (!rect || !sketch) return;
+    auto sketch2D = sketch->getSketch2D();
+
+    auto corners = rect->getKeyPoints();
+    gp_Pnt2d P = corners[(cornerIdx+3)%4];  // coin précédent
+    gp_Pnt2d V = corners[cornerIdx];          // coin à arrondir
+    gp_Pnt2d Q = corners[(cornerIdx+1)%4];  // coin suivant
+
+    double radius = askFilletRadius(this, P, V, Q);
+    if (radius < 0) { m_viewport->setSketchTool(SketchTool::None); return; }
+
+    gp_Pnt2d T1, T2, arcMid;
+    if (!computeFilletGeometry(P, V, Q, radius, T1, T2, arcMid)) {
+        QMessageBox::warning(this, "Congé", "Impossible de calculer le congé pour ce coin.");
+        m_viewport->setSketchTool(SketchTool::None);
+        return;
+    }
+
+    // Exploser le rectangle en 4 lignes + 1 arc
+    // Les 4 côtés du rectangle : side[i] va de corners[i] à corners[(i+1)%4]
+    // Le côté (cornerIdx+3)%4 finit en T1 ; le côté cornerIdx commence en T2
+    sketch2D->removeEntity(rect);
+
+    for (int i = 0; i < 4; i++) {
+        gp_Pnt2d start = corners[i];
+        gp_Pnt2d end   = corners[(i+1)%4];
+        if (i == (cornerIdx+3)%4) end   = T1;   // côté qui arrive au coin : raccourci
+        if (i == cornerIdx)        start = T2;   // côté qui part du coin : raccourci
+        auto line = std::make_shared<CADEngine::SketchLine>(start, end);
+        sketch2D->addEntity(line);
+    }
+
+    // Arc de congé : Bézier quadratique avec V comme point de contrôle
+    // → courbe qui part de T1, se dirige vers le coin V, et arrive en T2
+    auto arc = std::make_shared<CADEngine::SketchArc>(T1, T2, V, true);
+    sketch2D->addEntity(arc);
+
+    sketch2D->regenerateAutoDimensions();
+    m_viewport->update();
+    m_viewport->setSketchTool(SketchTool::None);
+    m_statusLabel->setText(QString("Congé R%1 appliqué au coin %2 du rectangle").arg(radius,0,'f',1).arg(cornerIdx));
+}
+
+// ============================================================================
+// Congé sur jonction de deux lignes
+// ============================================================================
+void MainWindow::onFilletLineCorner(
+    std::shared_ptr<CADEngine::SketchLine> line1, bool line1AtStart,
+    std::shared_ptr<CADEngine::SketchLine> line2, bool line2AtStart)
+{
+    auto sketch = m_viewport->getActiveSketch();
+    if (!line1 || !line2 || !sketch) return;
+    auto sketch2D = sketch->getSketch2D();
+
+    // V = coin partagé, P = autre extrémité de line1, Q = autre extrémité de line2
+    gp_Pnt2d V = line1AtStart ? line1->getStart() : line1->getEnd();
+    gp_Pnt2d P = line1AtStart ? line1->getEnd()   : line1->getStart();
+    gp_Pnt2d Q = line2AtStart ? line2->getEnd()   : line2->getStart();
+
+    double radius = askFilletRadius(this, P, V, Q);
+    if (radius < 0) { m_viewport->setSketchTool(SketchTool::None); return; }
+
+    gp_Pnt2d T1, T2, arcMid;
+    if (!computeFilletGeometry(P, V, Q, radius, T1, T2, arcMid)) {
+        QMessageBox::warning(this, "Congé", "Impossible de calculer le congé pour cet angle.");
+        m_viewport->setSketchTool(SketchTool::None);
+        return;
+    }
+
+    // Raccourcir line1 : T1 remplace V dans line1
+    if (line1AtStart) line1->setStart(T1); else line1->setEnd(T1);
+    // Raccourcir line2 : T2 remplace V dans line2
+    if (line2AtStart) line2->setStart(T2); else line2->setEnd(T2);
+
+    // Arc de congé : Bézier avec V comme point de contrôle
+    auto arc = std::make_shared<CADEngine::SketchArc>(T1, T2, V, true);
+    sketch2D->addEntity(arc);
+
+    sketch2D->regenerateAutoDimensions();
+    m_viewport->update();
+    m_viewport->setSketchTool(SketchTool::None);
+    m_statusLabel->setText(QString("Congé R%1 appliqué à la jonction de lignes").arg(radius,0,'f',1));
 }
 
 void MainWindow::onDeletePolylineSegment(int segmentIndex) {

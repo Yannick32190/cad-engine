@@ -1,6 +1,10 @@
 #include "SweepFeature.h"
 
 #include <BRepOffsetAPI_MakePipe.hxx>
+#include <BRepOffsetAPI_MakePipeShell.hxx>
+#include <ShapeAnalysis_FreeBounds.hxx>
+#include <TopTools_HSequenceOfShape.hxx>
+#include <BRep_Tool.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepBuilderAPI_MakeWire.hxx>
 #include <BRepAlgoAPI_Fuse.hxx>
@@ -9,6 +13,7 @@
 #include <TopExp_Explorer.hxx>
 #include <TopoDS.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
+#include <BRepTools.hxx>
 #include <gp_Dir.hxx>
 
 #include <iostream>
@@ -65,6 +70,23 @@ TopoDS_Face SweepFeature::buildProfileFace() const {
     return regions[0].face;
 }
 
+TopoDS_Wire SweepFeature::buildProfileWire() const {
+    if (!m_profileSketch || !m_profileSketch->getSketch2D()) return TopoDS_Wire();
+    auto sketch2D = m_profileSketch->getSketch2D();
+    auto regions = sketch2D->buildFaceRegions();
+    if (!regions.empty() && !regions[0].face.IsNull()) {
+        TopoDS_Wire w = BRepTools::OuterWire(regions[0].face);
+        if (!w.IsNull()) return w;
+    }
+    // fallback : reconstruire depuis les arêtes
+    auto edges = sketch2D->getEdges3D();
+    BRepBuilderAPI_MakeWire wm;
+    for (const auto& e : edges)
+        if (!e.IsNull()) wm.Add(e);
+    if (wm.IsDone()) return wm.Wire();
+    return TopoDS_Wire();
+}
+
 TopoDS_Wire SweepFeature::buildPathWire() const {
     if (!m_pathWire.IsNull()) return m_pathWire;
     if (!m_pathSketch || !m_pathSketch->getSketch2D()) return TopoDS_Wire();
@@ -73,39 +95,98 @@ TopoDS_Wire SweepFeature::buildPathWire() const {
     auto entities = sketch2D->getEntities();
     gp_Pln plane = sketch2D->getPlane();
 
-    BRepBuilderAPI_MakeWire wireBuilder;
+    // Collecter toutes les arêtes réelles (hors construction)
+    Handle(TopTools_HSequenceOfShape) edgeSeq = new TopTools_HSequenceOfShape();
     int edgeCount = 0;
 
     for (const auto& entity : entities) {
-        // Ignorer les entités de construction (axes, lignes d'aide)
         if (!entity || !entity->isValid() || entity->isConstruction()) continue;
         auto edges = entity->toEdges3D(plane);
         for (const auto& edge : edges) {
             if (!edge.IsNull()) {
-                wireBuilder.Add(edge);
+                edgeSeq->Append(edge);
                 edgeCount++;
             }
         }
     }
 
-    std::cout << "[Sweep] Path wire: " << edgeCount << " real edge(s) added" << std::endl;
+    std::cout << "[Sweep] Path wire: " << edgeCount << " real edge(s)" << std::endl;
 
     if (edgeCount == 0) {
-        std::cerr << "[Sweep] ERROR: Path sketch has no usable entities (only construction lines?)" << std::endl;
+        std::cerr << "[Sweep] ERROR: Path sketch has no usable entities" << std::endl;
         return TopoDS_Wire();
     }
-    if (!wireBuilder.IsDone()) {
-        // Donner un message d'erreur précis selon le code d'erreur
-        auto err = wireBuilder.Error();
-        if (err == BRepBuilderAPI_DisconnectedWire)
-            std::cerr << "[Sweep] ERROR: Path wire is disconnected — entities must be connected end-to-end" << std::endl;
-        else if (err == BRepBuilderAPI_NonManifoldWire)
-            std::cerr << "[Sweep] ERROR: Path wire is non-manifold" << std::endl;
-        else
-            std::cerr << "[Sweep] ERROR: Path wire build failed (code=" << err << ")" << std::endl;
-        return TopoDS_Wire();
+
+    // Collecte des arêtes dans un vecteur pour le tri topologique
+    std::vector<TopoDS_Edge> pool;
+    for (int i = 1; i <= edgeSeq->Length(); i++)
+        pool.push_back(TopoDS::Edge(edgeSeq->Value(i)));
+
+    // Tri topologique : on chaîne les arêtes en cherchant à chaque étape
+    // l'arête dont un endpoint coïncide avec la fin courante du wire.
+    auto edgeStart = [](const TopoDS_Edge& e) -> gp_Pnt {
+        TopExp_Explorer ex(e, TopAbs_VERTEX);
+        return BRep_Tool::Pnt(TopoDS::Vertex(ex.Current()));
+    };
+    auto edgeEnd = [](const TopoDS_Edge& e) -> gp_Pnt {
+        TopExp_Explorer ex(e, TopAbs_VERTEX);
+        ex.Next();
+        if (ex.More()) return BRep_Tool::Pnt(TopoDS::Vertex(ex.Current()));
+        // edge dégénérée : retourner le premier vertex
+        TopExp_Explorer ex2(e, TopAbs_VERTEX);
+        return BRep_Tool::Pnt(TopoDS::Vertex(ex2.Current()));
+    };
+
+    const double matchTol = 1.0; // tolérance de connexion en mm
+
+    std::vector<TopoDS_Edge> ordered;
+    std::vector<bool> used(pool.size(), false);
+
+    // Démarrer avec la première arête
+    ordered.push_back(pool[0]);
+    used[0] = true;
+    gp_Pnt currentEnd = edgeEnd(pool[0]);
+
+    while (ordered.size() < pool.size()) {
+        bool found = false;
+        for (size_t i = 0; i < pool.size(); i++) {
+            if (used[i]) continue;
+            gp_Pnt s = edgeStart(pool[i]);
+            gp_Pnt e = edgeEnd(pool[i]);
+            if (currentEnd.Distance(s) < matchTol) {
+                // Arête en avant
+                ordered.push_back(pool[i]);
+                used[i] = true;
+                currentEnd = e;
+                found = true;
+                break;
+            } else if (currentEnd.Distance(e) < matchTol) {
+                // Arête à inverser
+                TopoDS_Edge rev = TopoDS::Edge(pool[i].Reversed());
+                ordered.push_back(rev);
+                used[i] = true;
+                currentEnd = s;
+                found = true;
+                break;
+            }
+        }
+        if (!found) {
+            std::cerr << "[Sweep] WARNING: Path wire has gap, stopping at " << ordered.size() << " edges" << std::endl;
+            break;
+        }
     }
-    return wireBuilder.Wire();
+
+    BRepBuilderAPI_MakeWire wireBuilder;
+    for (const auto& e : ordered)
+        wireBuilder.Add(e);
+
+    if (wireBuilder.IsDone()) {
+        std::cout << "[Sweep] Path wire: built with topological sort (" << ordered.size() << " edges)" << std::endl;
+        return wireBuilder.Wire();
+    }
+
+    std::cerr << "[Sweep] ERROR: Path wire build failed after topological sort" << std::endl;
+    return TopoDS_Wire();
 }
 
 bool SweepFeature::compute() {
@@ -137,16 +218,45 @@ bool SweepFeature::compute() {
     }
 
     try {
-        BRepOffsetAPI_MakePipe pipe(path, profile);
-        pipe.Build();
+        TopoDS_Shape sweepShape;
 
-        if (!pipe.IsDone()) {
-            std::cerr << "[Sweep] ERROR: MakePipe failed — check that path is continuous "
-                         "and profile is at path start" << std::endl;
-            return false;
+        // MakePipeShell gère correctement les coins à 90° (mode RightCorner)
+        // contrairement à MakePipe qui aplatit les transitions aux angles
+        TopoDS_Wire profileWire = buildProfileWire();
+        bool usedPipeShell = false;
+
+        if (!profileWire.IsNull()) {
+            try {
+                BRepOffsetAPI_MakePipeShell pipeShell(path);
+                pipeShell.Add(profileWire);
+                pipeShell.SetTransitionMode(BRepBuilderAPI_RightCorner);
+
+                if (pipeShell.IsReady()) {
+                    pipeShell.Build();
+                    if (pipeShell.IsDone()) {
+                        pipeShell.MakeSolid();
+                        sweepShape = pipeShell.Shape();
+                        usedPipeShell = true;
+                        std::cout << "[Sweep] MakePipeShell (RightCorner): OK" << std::endl;
+                    }
+                }
+            } catch (Standard_Failure& e) {
+                std::cerr << "[Sweep] MakePipeShell failed: " << e.GetMessageString()
+                          << " — fallback to MakePipe" << std::endl;
+            }
         }
 
-        TopoDS_Shape sweepShape = pipe.Shape();
+        // Fallback : MakePipe classique
+        if (!usedPipeShell) {
+            BRepOffsetAPI_MakePipe pipe(path, profile);
+            pipe.Build();
+            if (!pipe.IsDone()) {
+                std::cerr << "[Sweep] ERROR: MakePipe failed" << std::endl;
+                return false;
+            }
+            sweepShape = pipe.Shape();
+            std::cout << "[Sweep] MakePipe (fallback): OK" << std::endl;
+        }
 
         ExtrudeOperation op = getOperation();
         if (op == ExtrudeOperation::NewBody || m_existingBody.IsNull()) {

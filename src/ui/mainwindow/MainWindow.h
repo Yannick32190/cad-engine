@@ -93,6 +93,9 @@ private slots:
     void onDeletePolylineSegment(int segmentIndex);
     void refreshAllAngularDimensions();
     void onFilletVertex(std::shared_ptr<CADEngine::SketchPolyline> polyline, int vertexIndex);
+    void onFilletRectCorner(std::shared_ptr<CADEngine::SketchRectangle> rect, int cornerIdx);
+    void onFilletLineCorner(std::shared_ptr<CADEngine::SketchLine> line1, bool line1AtStart,
+                             std::shared_ptr<CADEngine::SketchLine> line2, bool line2AtStart);
     
     // Contraintes géométriques
     void onConstraintHorizontal();

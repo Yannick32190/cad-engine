@@ -3745,39 +3745,64 @@ void Viewport3D::handleConstraintClick(const gp_Pnt2d& pt) {
     }
     
     // ================================================================
-    // CONGÉ (Fillet) - 1 clic sur un vertex de polyline
+    // CONGÉ (Fillet) - clic sur un angle (polyline, rectangle, jonction lignes)
     // ================================================================
     if (m_currentTool == SketchTool::Fillet) {
-        if (!clickedEntity || clickedEntity->getType() != CADEngine::SketchEntityType::Polyline) {
-            emit statusMessage("Cliquez sur un vertex de polyline (jonction de 2 segments) !");
-            return;
-        }
-        
-        auto polyline = std::dynamic_pointer_cast<CADEngine::SketchPolyline>(clickedEntity);
-        auto points = polyline->getPoints();
-        
-        if (points.size() < 3) {
-            emit statusMessage("La polyline doit avoir au moins 3 points pour un congé !");
-            return;
-        }
-        
-        // Trouver le vertex le plus proche (pas les extrémités)
         double tolerance = CADEngine::ViewportScaling::getClickTolerance(m_sketch2DZoom);
-        int closestVertex = -1;
-        double minDist = tolerance;
-        
-        for (int i = 1; i < (int)points.size() - 1; i++) {
-            double dist = pt.Distance(points[i]);
-            if (dist < minDist) { minDist = dist; closestVertex = i; }
+        auto sketch2D = m_activeSketch->getSketch2D();
+
+        // 1. Vertex intérieur de polyline (comportement existant)
+        if (clickedEntity && clickedEntity->getType() == CADEngine::SketchEntityType::Polyline) {
+            auto polyline = std::dynamic_pointer_cast<CADEngine::SketchPolyline>(clickedEntity);
+            auto points = polyline->getPoints();
+            if (points.size() >= 3) {
+                int closestVertex = -1;
+                double minDist = tolerance;
+                for (int i = 1; i < (int)points.size() - 1; i++) {
+                    double dist = pt.Distance(points[i]);
+                    if (dist < minDist) { minDist = dist; closestVertex = i; }
+                }
+                if (closestVertex >= 0) {
+                    emit filletRequested(polyline, closestVertex);
+                    return;
+                }
+            }
         }
-        
-        if (closestVertex < 0) {
-            emit statusMessage("Cliquez plus près d'un vertex intérieur de polyline !");
+
+        // 2. Coin de rectangle
+        for (const auto& entity : sketch2D->getEntities()) {
+            if (entity->isConstruction()) continue;
+            if (entity->getType() == CADEngine::SketchEntityType::Rectangle) {
+                auto rect = std::dynamic_pointer_cast<CADEngine::SketchRectangle>(entity);
+                auto corners = rect->getKeyPoints();
+                for (int i = 0; i < 4; i++) {
+                    if (pt.Distance(corners[i]) < tolerance) {
+                        emit filletRectCornerRequested(rect, i);
+                        return;
+                    }
+                }
+            }
+        }
+
+        // 3. Jonction de deux lignes partageant un endpoint
+        std::vector<std::pair<std::shared_ptr<CADEngine::SketchLine>, bool>> nearLines;
+        for (const auto& entity : sketch2D->getEntities()) {
+            if (entity->isConstruction()) continue;
+            if (entity->getType() == CADEngine::SketchEntityType::Line) {
+                auto line = std::dynamic_pointer_cast<CADEngine::SketchLine>(entity);
+                if (pt.Distance(line->getStart()) < tolerance)
+                    nearLines.push_back({line, true});
+                else if (pt.Distance(line->getEnd()) < tolerance)
+                    nearLines.push_back({line, false});
+            }
+        }
+        if (nearLines.size() >= 2) {
+            emit filletLineCornerRequested(nearLines[0].first, nearLines[0].second,
+                                           nearLines[1].first, nearLines[1].second);
             return;
         }
-        
-        // Demander le rayon via signal (sera intercepté par MainWindow)
-        emit filletRequested(polyline, closestVertex);
+
+        emit statusMessage("Cliquez sur un angle : coin de rectangle, vertex de polyline ou jonction de lignes");
         return;
     }
 }

@@ -169,6 +169,9 @@ signals:
     void entityRightClicked(std::shared_ptr<CADEngine::SketchEntity> entity, QPoint globalPos);
     void dimensionRightClicked(std::shared_ptr<CADEngine::Dimension> dimension, QPoint globalPos);
     void filletRequested(std::shared_ptr<CADEngine::SketchPolyline> polyline, int vertexIndex);
+    void filletRectCornerRequested(std::shared_ptr<CADEngine::SketchRectangle> rect, int cornerIdx);
+    void filletLineCornerRequested(std::shared_ptr<CADEngine::SketchLine> line1, bool line1AtStart,
+                                    std::shared_ptr<CADEngine::SketchLine> line2, bool line2AtStart);
     void faceClicked(TopoDS_Face face);
     void faceSelected(TopoDS_Face face);  // For Sketch on Face mode
     void faceSelectionCancelled();         // Escape during face selection
