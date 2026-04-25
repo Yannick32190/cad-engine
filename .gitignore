@@ -1,0 +1,38 @@
+# Build output
+build/
+out/
+*.o
+*.a
+*.so
+*.dll
+*.exe
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+_autogen/
+
+# IDE
+.vscode/
+.idea/
+*.user
+*.suo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp
+*.tmp
+*.log
+
+# Local Claude config
+.claude/
+
+# Sub-projects non liés et archives
+projet/arduino-visual-programmer/
+projet/realdash/
+projet/cad/
+projet/cad-engine_V0_8_phase1_3D.tar.gz
