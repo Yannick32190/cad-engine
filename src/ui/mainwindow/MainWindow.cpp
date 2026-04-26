@@ -709,7 +709,11 @@ void MainWindow::onNew() {
     m_tree->setDocument(m_document);
     m_viewport->setDocument(m_document);
     
-    // Vider le cache de tessellation 3D
+    // Réinitialiser complètement l'état 3D du viewport
+    m_viewport->stopEdgeSelection();
+    m_viewport->stopFaceSelection();
+    m_viewport->stopProfileSelection();
+    m_viewport->clearPatternPreview();
     m_viewport->invalidateTessCache();
     m_viewport->clearSelectedEdges3D();
     m_viewport->clearSelectedFace();
@@ -3962,91 +3966,163 @@ void MainWindow::onExportSketchDXF(std::shared_ptr<CADEngine::SketchFeature> ske
     out << "  2\n";
     out << "ENTITIES\n";
     
+    // Lambda: écrire une ligne DXF
+    auto dxfLine = [&](double x1, double y1, double x2, double y2) {
+        out << "  0\nLINE\n  8\nSKETCH\n";
+        out << " 10\n" << QString::number(x1, 'f', 6) << "\n";
+        out << " 20\n" << QString::number(y1, 'f', 6) << "\n";
+        out << " 30\n0.0\n";
+        out << " 11\n" << QString::number(x2, 'f', 6) << "\n";
+        out << " 21\n" << QString::number(y2, 'f', 6) << "\n";
+        out << " 31\n0.0\n";
+    };
+
     auto sketch2D = sketch->getSketch2D();
     if (sketch2D) {
         for (const auto& entity : sketch2D->getEntities()) {
+            if (entity->isConstruction()) continue;
+
             if (entity->getType() == CADEngine::SketchEntityType::Line) {
                 auto line = std::dynamic_pointer_cast<CADEngine::SketchLine>(entity);
-                if (line) {
-                    gp_Pnt2d start = line->getStart();
-                    gp_Pnt2d end = line->getEnd();
-                    
-                    out << "  0\n";
-                    out << "LINE\n";
-                    out << "  8\n";
-                    out << "SKETCH\n";  // Layer
-                    out << " 10\n";
-                    out << QString::number(start.X(), 'f', 6) << "\n";
-                    out << " 20\n";
-                    out << QString::number(start.Y(), 'f', 6) << "\n";
-                    out << " 30\n";
-                    out << "0.0\n";
-                    out << " 11\n";
-                    out << QString::number(end.X(), 'f', 6) << "\n";
-                    out << " 21\n";
-                    out << QString::number(end.Y(), 'f', 6) << "\n";
-                    out << " 31\n";
-                    out << "0.0\n";
-                }
+                if (line)
+                    dxfLine(line->getStart().X(), line->getStart().Y(),
+                            line->getEnd().X(),   line->getEnd().Y());
             }
             else if (entity->getType() == CADEngine::SketchEntityType::Circle) {
                 auto circle = std::dynamic_pointer_cast<CADEngine::SketchCircle>(entity);
                 if (circle) {
                     gp_Pnt2d center = circle->getCenter();
-                    double radius = circle->getRadius();
-                    
-                    out << "  0\n";
-                    out << "CIRCLE\n";
-                    out << "  8\n";
-                    out << "SKETCH\n";
-                    out << " 10\n";
-                    out << QString::number(center.X(), 'f', 6) << "\n";
-                    out << " 20\n";
-                    out << QString::number(center.Y(), 'f', 6) << "\n";
-                    out << " 30\n";
-                    out << "0.0\n";
-                    out << " 40\n";
-                    out << QString::number(radius, 'f', 6) << "\n";
+                    out << "  0\nCIRCLE\n  8\nSKETCH\n";
+                    out << " 10\n" << QString::number(center.X(), 'f', 6) << "\n";
+                    out << " 20\n" << QString::number(center.Y(), 'f', 6) << "\n";
+                    out << " 30\n0.0\n";
+                    out << " 40\n" << QString::number(circle->getRadius(), 'f', 6) << "\n";
                 }
             }
             else if (entity->getType() == CADEngine::SketchEntityType::Arc) {
                 auto arc = std::dynamic_pointer_cast<CADEngine::SketchArc>(entity);
                 if (arc) {
-                    // Convertir arc 3 points en arc centre+rayon+angles
                     gp_Pnt2d p1 = arc->getStart();
                     gp_Pnt2d p2 = arc->getMid();
                     gp_Pnt2d p3 = arc->getEnd();
-                    
-                    // Calculer centre et rayon (formules géométriques)
-                    double ax = p1.X(), ay = p1.Y();
-                    double bx = p2.X(), by = p2.Y();
-                    double cx = p3.X(), cy = p3.Y();
-                    
-                    double d = 2.0 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by));
-                    if (std::abs(d) > 1e-10) {
-                        double ux = ((ax*ax + ay*ay) * (by - cy) + (bx*bx + by*by) * (cy - ay) + (cx*cx + cy*cy) * (ay - by)) / d;
-                        double uy = ((ax*ax + ay*ay) * (cx - bx) + (bx*bx + by*by) * (ax - cx) + (cx*cx + cy*cy) * (bx - ax)) / d;
-                        
-                        double radius = std::sqrt((ax - ux) * (ax - ux) + (ay - uy) * (ay - uy));
-                        double angle1 = std::atan2(ay - uy, ax - ux) * 180.0 / M_PI;
-                        double angle2 = std::atan2(cy - uy, cx - ux) * 180.0 / M_PI;
-                        
-                        out << "  0\n";
-                        out << "ARC\n";
-                        out << "  8\n";
-                        out << "SKETCH\n";
-                        out << " 10\n";
-                        out << QString::number(ux, 'f', 6) << "\n";
-                        out << " 20\n";
-                        out << QString::number(uy, 'f', 6) << "\n";
-                        out << " 30\n";
-                        out << "0.0\n";
-                        out << " 40\n";
-                        out << QString::number(radius, 'f', 6) << "\n";
-                        out << " 50\n";
-                        out << QString::number(angle1, 'f', 6) << "\n";
-                        out << " 51\n";
-                        out << QString::number(angle2, 'f', 6) << "\n";
+
+                    if (arc->isBezier()) {
+                        // Arc Bézier quadratique : approximé par 16 segments de ligne
+                        gp_Pnt2d prev = p1;
+                        for (int i = 1; i <= 16; ++i) {
+                            double t = (double)i / 16.0;
+                            double mt = 1.0 - t;
+                            double nx = mt*mt*p1.X() + 2*mt*t*p2.X() + t*t*p3.X();
+                            double ny = mt*mt*p1.Y() + 2*mt*t*p2.Y() + t*t*p3.Y();
+                            dxfLine(prev.X(), prev.Y(), nx, ny);
+                            prev = gp_Pnt2d(nx, ny);
+                        }
+                    } else {
+                        // Arc circulaire : calculer centre et rayon
+                        double ax = p1.X(), ay = p1.Y();
+                        double bx = p2.X(), by = p2.Y();
+                        double cx = p3.X(), cy = p3.Y();
+                        double d = 2.0 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by));
+                        if (std::abs(d) > 1e-10) {
+                            double ux = ((ax*ax + ay*ay) * (by - cy) + (bx*bx + by*by) * (cy - ay) + (cx*cx + cy*cy) * (ay - by)) / d;
+                            double uy = ((ax*ax + ay*ay) * (cx - bx) + (bx*bx + by*by) * (ax - cx) + (cx*cx + cy*cy) * (bx - ax)) / d;
+                            double radius = std::sqrt((ax - ux)*(ax - ux) + (ay - uy)*(ay - uy));
+                            double angle1 = std::atan2(ay - uy, ax - ux) * 180.0 / M_PI;
+                            double angle2 = std::atan2(cy - uy, cx - ux) * 180.0 / M_PI;
+                            out << "  0\nARC\n  8\nSKETCH\n";
+                            out << " 10\n" << QString::number(ux, 'f', 6) << "\n";
+                            out << " 20\n" << QString::number(uy, 'f', 6) << "\n";
+                            out << " 30\n0.0\n";
+                            out << " 40\n" << QString::number(radius, 'f', 6) << "\n";
+                            out << " 50\n" << QString::number(angle1, 'f', 6) << "\n";
+                            out << " 51\n" << QString::number(angle2, 'f', 6) << "\n";
+                        }
+                    }
+                }
+            }
+            else if (entity->getType() == CADEngine::SketchEntityType::Rectangle) {
+                auto rect = std::dynamic_pointer_cast<CADEngine::SketchRectangle>(entity);
+                if (rect) {
+                    auto corners = rect->getKeyPoints();
+                    for (int i = 0; i < 4; ++i) {
+                        const auto& a = corners[i];
+                        const auto& b = corners[(i + 1) % 4];
+                        dxfLine(a.X(), a.Y(), b.X(), b.Y());
+                    }
+                }
+            }
+            else if (entity->getType() == CADEngine::SketchEntityType::Polyline) {
+                auto polyline = std::dynamic_pointer_cast<CADEngine::SketchPolyline>(entity);
+                if (polyline) {
+                    auto pts = polyline->getPoints();
+                    for (size_t i = 0; i + 1 < pts.size(); ++i)
+                        dxfLine(pts[i].X(), pts[i].Y(), pts[i+1].X(), pts[i+1].Y());
+                }
+            }
+            else if (entity->getType() == CADEngine::SketchEntityType::Ellipse) {
+                auto ellipse = std::dynamic_pointer_cast<CADEngine::SketchEllipse>(entity);
+                if (ellipse) {
+                    // Approximation 64 segments
+                    gp_Pnt2d center = ellipse->getCenter();
+                    double a = ellipse->getMajorRadius(), b = ellipse->getMinorRadius();
+                    double rot = ellipse->getRotation();
+                    double cosR = std::cos(rot), sinR = std::sin(rot);
+                    const int N = 64;
+                    gp_Pnt2d prev(center.X() + a*cosR, center.Y() + a*sinR);
+                    for (int i = 1; i <= N; ++i) {
+                        double t = 2.0 * M_PI * i / N;
+                        double lx = a * std::cos(t), ly = b * std::sin(t);
+                        gp_Pnt2d cur(center.X() + lx*cosR - ly*sinR,
+                                     center.Y() + lx*sinR + ly*cosR);
+                        dxfLine(prev.X(), prev.Y(), cur.X(), cur.Y());
+                        prev = cur;
+                    }
+                }
+            }
+            else if (entity->getType() == CADEngine::SketchEntityType::Polygon) {
+                auto polygon = std::dynamic_pointer_cast<CADEngine::SketchPolygon>(entity);
+                if (polygon) {
+                    auto verts = polygon->getVertices();
+                    for (size_t i = 0; i < verts.size(); ++i) {
+                        const auto& a = verts[i];
+                        const auto& b = verts[(i + 1) % verts.size()];
+                        dxfLine(a.X(), a.Y(), b.X(), b.Y());
+                    }
+                }
+            }
+            else if (entity->getType() == CADEngine::SketchEntityType::Oblong) {
+                auto oblong = std::dynamic_pointer_cast<CADEngine::SketchOblong>(entity);
+                if (oblong) {
+                    gp_Pnt2d center = oblong->getCenter();
+                    double L = oblong->getLength(), W = oblong->getWidth();
+                    double rot = oblong->getRotation();
+                    double r = W / 2.0, halfS = (L - W) / 2.0;
+                    double cosR = std::cos(rot), sinR = std::sin(rot);
+                    // Deux droites + deux demi-cercles (32 segments chacun)
+                    gp_Pnt2d p1(center.X() - halfS*cosR + r*(-sinR), center.Y() - halfS*sinR + r*cosR);
+                    gp_Pnt2d p2(center.X() + halfS*cosR + r*(-sinR), center.Y() + halfS*sinR + r*cosR);
+                    gp_Pnt2d p3(center.X() + halfS*cosR - r*(-sinR), center.Y() + halfS*sinR - r*cosR);
+                    gp_Pnt2d p4(center.X() - halfS*cosR - r*(-sinR), center.Y() - halfS*sinR - r*cosR);
+                    dxfLine(p1.X(), p1.Y(), p2.X(), p2.Y());
+                    dxfLine(p3.X(), p3.Y(), p4.X(), p4.Y());
+                    // Demi-cercle droit
+                    double baseAngle = std::atan2(cosR, -sinR);
+                    gp_Pnt2d c2(center.X() + halfS*cosR, center.Y() + halfS*sinR);
+                    gp_Pnt2d prev2 = p2;
+                    for (int i = 1; i <= 32; ++i) {
+                        double a = baseAngle - M_PI * i / 32.0;
+                        gp_Pnt2d cur(c2.X() + r*std::cos(a), c2.Y() + r*std::sin(a));
+                        dxfLine(prev2.X(), prev2.Y(), cur.X(), cur.Y());
+                        prev2 = cur;
+                    }
+                    // Demi-cercle gauche
+                    gp_Pnt2d c1(center.X() - halfS*cosR, center.Y() - halfS*sinR);
+                    gp_Pnt2d prev1 = p4;
+                    for (int i = 1; i <= 32; ++i) {
+                        double a = baseAngle + M_PI - M_PI * i / 32.0;
+                        gp_Pnt2d cur(c1.X() + r*std::cos(a), c1.Y() + r*std::sin(a));
+                        dxfLine(prev1.X(), prev1.Y(), cur.X(), cur.Y());
+                        prev1 = cur;
                     }
                 }
             }
@@ -4125,6 +4201,7 @@ void MainWindow::onExportSketchPDF(std::shared_ptr<CADEngine::SketchFeature> ske
     };
     
     for (const auto& entity : sketch2D->getEntities()) {
+        if (entity->isConstruction()) continue;
         if (entity->getType() == CADEngine::SketchEntityType::Line) {
             auto line = std::dynamic_pointer_cast<CADEngine::SketchLine>(entity);
             if (line) {
@@ -4330,7 +4407,8 @@ void MainWindow::onExportSketchPDF(std::shared_ptr<CADEngine::SketchFeature> ske
     painter.setBrush(Qt::NoBrush);
     
     for (const auto& entity : sketch2D->getEntities()) {
-        
+        if (entity->isConstruction()) continue;
+
         // --- LINE ---
         if (entity->getType() == CADEngine::SketchEntityType::Line) {
             auto line = std::dynamic_pointer_cast<CADEngine::SketchLine>(entity);

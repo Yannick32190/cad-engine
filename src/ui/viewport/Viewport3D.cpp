@@ -6556,9 +6556,13 @@ void Viewport3D::renderAllFeatures() {
         renderSolidShape(lastBody, lastBodyFeatureId, 0.6f, 0.65f, 0.72f);
     }
     
-    // Update currentBody reference
+    // Update currentBody reference — clear if document has no 3D body
     if (!lastBody.IsNull()) {
         m_currentBody = lastBody;
+    } else {
+        m_currentBody = TopoDS_Shape();
+        m_hoveredFace = TopoDS_Face();
+        m_tessCache.clear();
     }
     
     // ================================================================
