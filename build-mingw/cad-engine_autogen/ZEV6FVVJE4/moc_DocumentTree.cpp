@@ -48,7 +48,8 @@ template <> constexpr inline auto DocumentTree::qt_create_metaobjectdata<qt_meta
         "exportSketchDXFRequested",
         "std::shared_ptr<CADEngine::SketchFeature>",
         "sketch",
-        "exportSketchPDFRequested",
+        "exportSketchRealSizePDFRequested",
+        "exportSketchPlanRequested",
         "onItemClicked",
         "QTreeWidgetItem*",
         "item",
@@ -76,21 +77,25 @@ template <> constexpr inline auto DocumentTree::qt_create_metaobjectdata<qt_meta
         QtMocHelpers::SignalData<void(std::shared_ptr<CADEngine::SketchFeature>)>(7, 2, QMC::AccessPublic, QMetaType::Void, {{
             { 0x80000000 | 8, 9 },
         }}),
-        // Signal 'exportSketchPDFRequested'
+        // Signal 'exportSketchRealSizePDFRequested'
         QtMocHelpers::SignalData<void(std::shared_ptr<CADEngine::SketchFeature>)>(10, 2, QMC::AccessPublic, QMetaType::Void, {{
             { 0x80000000 | 8, 9 },
         }}),
+        // Signal 'exportSketchPlanRequested'
+        QtMocHelpers::SignalData<void(std::shared_ptr<CADEngine::SketchFeature>)>(11, 2, QMC::AccessPublic, QMetaType::Void, {{
+            { 0x80000000 | 8, 9 },
+        }}),
         // Slot 'onItemClicked'
-        QtMocHelpers::SlotData<void(QTreeWidgetItem *, int)>(11, 2, QMC::AccessPrivate, QMetaType::Void, {{
-            { 0x80000000 | 12, 13 }, { QMetaType::Int, 14 },
+        QtMocHelpers::SlotData<void(QTreeWidgetItem *, int)>(12, 2, QMC::AccessPrivate, QMetaType::Void, {{
+            { 0x80000000 | 13, 14 }, { QMetaType::Int, 15 },
         }}),
         // Slot 'onItemDoubleClicked'
-        QtMocHelpers::SlotData<void(QTreeWidgetItem *, int)>(15, 2, QMC::AccessPrivate, QMetaType::Void, {{
-            { 0x80000000 | 12, 13 }, { QMetaType::Int, 14 },
+        QtMocHelpers::SlotData<void(QTreeWidgetItem *, int)>(16, 2, QMC::AccessPrivate, QMetaType::Void, {{
+            { 0x80000000 | 13, 14 }, { QMetaType::Int, 15 },
         }}),
         // Slot 'onContextMenu'
-        QtMocHelpers::SlotData<void(const QPoint &)>(16, 2, QMC::AccessPrivate, QMetaType::Void, {{
-            { 0x80000000 | 17, 18 },
+        QtMocHelpers::SlotData<void(const QPoint &)>(17, 2, QMC::AccessPrivate, QMetaType::Void, {{
+            { 0x80000000 | 18, 19 },
         }}),
     };
     QtMocHelpers::UintData qt_properties {
@@ -119,10 +124,11 @@ void DocumentTree::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id
         case 1: _t->featureDoubleClicked((*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::Feature>>>(_a[1]))); break;
         case 2: _t->deleteFeatureRequested((*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::Feature>>>(_a[1]))); break;
         case 3: _t->exportSketchDXFRequested((*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::SketchFeature>>>(_a[1]))); break;
-        case 4: _t->exportSketchPDFRequested((*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::SketchFeature>>>(_a[1]))); break;
-        case 5: _t->onItemClicked((*reinterpret_cast<std::add_pointer_t<QTreeWidgetItem*>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<int>>(_a[2]))); break;
-        case 6: _t->onItemDoubleClicked((*reinterpret_cast<std::add_pointer_t<QTreeWidgetItem*>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<int>>(_a[2]))); break;
-        case 7: _t->onContextMenu((*reinterpret_cast<std::add_pointer_t<QPoint>>(_a[1]))); break;
+        case 4: _t->exportSketchRealSizePDFRequested((*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::SketchFeature>>>(_a[1]))); break;
+        case 5: _t->exportSketchPlanRequested((*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::SketchFeature>>>(_a[1]))); break;
+        case 6: _t->onItemClicked((*reinterpret_cast<std::add_pointer_t<QTreeWidgetItem*>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<int>>(_a[2]))); break;
+        case 7: _t->onItemDoubleClicked((*reinterpret_cast<std::add_pointer_t<QTreeWidgetItem*>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<int>>(_a[2]))); break;
+        case 8: _t->onContextMenu((*reinterpret_cast<std::add_pointer_t<QPoint>>(_a[1]))); break;
         default: ;
         }
     }
@@ -135,7 +141,9 @@ void DocumentTree::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id
             return;
         if (QtMocHelpers::indexOfMethod<void (DocumentTree::*)(std::shared_ptr<CADEngine::SketchFeature> )>(_a, &DocumentTree::exportSketchDXFRequested, 3))
             return;
-        if (QtMocHelpers::indexOfMethod<void (DocumentTree::*)(std::shared_ptr<CADEngine::SketchFeature> )>(_a, &DocumentTree::exportSketchPDFRequested, 4))
+        if (QtMocHelpers::indexOfMethod<void (DocumentTree::*)(std::shared_ptr<CADEngine::SketchFeature> )>(_a, &DocumentTree::exportSketchRealSizePDFRequested, 4))
+            return;
+        if (QtMocHelpers::indexOfMethod<void (DocumentTree::*)(std::shared_ptr<CADEngine::SketchFeature> )>(_a, &DocumentTree::exportSketchPlanRequested, 5))
             return;
     }
 }
@@ -159,14 +167,14 @@ int DocumentTree::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        if (_id < 8)
+        if (_id < 9)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 8;
+        _id -= 9;
     }
     if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
-        if (_id < 8)
+        if (_id < 9)
             *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType();
-        _id -= 8;
+        _id -= 9;
     }
     return _id;
 }
@@ -196,8 +204,14 @@ void DocumentTree::exportSketchDXFRequested(std::shared_ptr<CADEngine::SketchFea
 }
 
 // SIGNAL 4
-void DocumentTree::exportSketchPDFRequested(std::shared_ptr<CADEngine::SketchFeature> _t1)
+void DocumentTree::exportSketchRealSizePDFRequested(std::shared_ptr<CADEngine::SketchFeature> _t1)
 {
     QMetaObject::activate<void>(this, &staticMetaObject, 4, nullptr, _t1);
+}
+
+// SIGNAL 5
+void DocumentTree::exportSketchPlanRequested(std::shared_ptr<CADEngine::SketchFeature> _t1)
+{
+    QMetaObject::activate<void>(this, &staticMetaObject, 5, nullptr, _t1);
 }
 QT_WARNING_POP

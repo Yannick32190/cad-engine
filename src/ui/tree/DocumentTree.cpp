@@ -277,7 +277,8 @@ void DocumentTree::onContextMenu(const QPoint& pos) {
     if (sketch) {
         menu.addSeparator();
         actExportDXF = menu.addAction("Exporter en DXF...");
-        actExportPDF = menu.addAction("Exporter en PDF...");
+        actExportPDF = menu.addAction("Export taille réelle 1:1 (PDF)...");
+        menu.addAction("Exporter en Plan (PDF)...")->setData("plan");
     }
     
     menu.addSeparator();
@@ -306,7 +307,9 @@ void DocumentTree::onContextMenu(const QPoint& pos) {
         emit exportSketchDXFRequested(sketch);
     }
     else if (actExportPDF && selected == actExportPDF) {
-        qDebug() << "[DocumentTree] Export PDF demandé pour sketch:" << QString::fromStdString(feature->getName());
-        emit exportSketchPDFRequested(sketch);
+        emit exportSketchRealSizePDFRequested(sketch);
+    }
+    else if (selected && selected->data().toString() == "plan") {
+        emit exportSketchPlanRequested(sketch);
     }
 }

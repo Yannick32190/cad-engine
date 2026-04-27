@@ -198,8 +198,9 @@ MainWindow::MainWindow(QWidget* parent)
     connect(m_tree, &DocumentTree::featureSelected, this, &MainWindow::onFeatureSelected);
     connect(m_tree, &DocumentTree::featureDoubleClicked, this, &MainWindow::onFeatureDoubleClicked);
     connect(m_tree, &DocumentTree::deleteFeatureRequested, this, &MainWindow::onFeatureDeleted);
-    connect(m_tree, &DocumentTree::exportSketchDXFRequested, this, &MainWindow::onExportSketchDXF);
-    connect(m_tree, &DocumentTree::exportSketchPDFRequested, this, &MainWindow::onExportSketchPDF);
+    connect(m_tree, &DocumentTree::exportSketchDXFRequested,        this, &MainWindow::onExportSketchDXF);
+    connect(m_tree, &DocumentTree::exportSketchRealSizePDFRequested, this, &MainWindow::onExportSketchRealSizePDF);
+    connect(m_tree, &DocumentTree::exportSketchPlanRequested,        this, &MainWindow::onExportSketchPlan);
     
     // UI
     createActions();
@@ -4174,7 +4175,7 @@ void MainWindow::onExportSketchDXF(std::shared_ptr<CADEngine::SketchFeature> ske
 // Export Sketch en PDF (avec cotations et angles)
 // ============================================================================
 
-void MainWindow::onExportSketchPDF(std::shared_ptr<CADEngine::SketchFeature> sketch) {
+void MainWindow::onExportSketchRealSizePDF(std::shared_ptr<CADEngine::SketchFeature> sketch) {
     if (!sketch) return;
     
     auto sketch2D = sketch->getSketch2D();
@@ -4193,7 +4194,18 @@ void MainWindow::onExportSketchPDF(std::shared_ptr<CADEngine::SketchFeature> ske
     // === Calcul du bounding box de toutes les entités + dimensions ===
     double minX = 1e18, minY = 1e18, maxX = -1e18, maxY = -1e18;
     
+    // keyPoints : géométrie pure (entités seulement) — utilisé pour l'optimisation de rotation
+    // expandBBox : met à jour les deux (entités)
+    // expandBBoxDim : met à jour uniquement le bbox global (cotations) — pas dans keyPoints
+    std::vector<std::pair<double,double>> keyPoints;
     auto expandBBox = [&](double x, double y) {
+        keyPoints.emplace_back(x, y);
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+    };
+    auto expandBBoxDim = [&](double x, double y) {
         if (x < minX) minX = x;
         if (x > maxX) maxX = x;
         if (y < minY) minY = y;
@@ -4277,28 +4289,28 @@ void MainWindow::onExportSketchPDF(std::shared_ptr<CADEngine::SketchFeature> ske
     
     for (const auto& dim : allDimsForBBox) {
         gp_Pnt2d tp = dim->getTextPosition();
-        expandBBox(tp.X(), tp.Y());
-        
+        expandBBoxDim(tp.X(), tp.Y());
+
         if (dim->getType() == CADEngine::DimensionType::Linear) {
             auto ld = std::dynamic_pointer_cast<CADEngine::LinearDimension>(dim);
             if (ld) {
-                expandBBox(ld->getDimensionLineStart().X(), ld->getDimensionLineStart().Y());
-                expandBBox(ld->getDimensionLineEnd().X(), ld->getDimensionLineEnd().Y());
+                expandBBoxDim(ld->getDimensionLineStart().X(), ld->getDimensionLineStart().Y());
+                expandBBoxDim(ld->getDimensionLineEnd().X(), ld->getDimensionLineEnd().Y());
             }
         }
         else if (dim->getType() == CADEngine::DimensionType::Angular) {
             auto ad = std::dynamic_pointer_cast<CADEngine::AngularDimension>(dim);
             if (ad) {
                 double r = ad->getRadius();
-                expandBBox(ad->getCenter().X() - r, ad->getCenter().Y() - r);
-                expandBBox(ad->getCenter().X() + r, ad->getCenter().Y() + r);
+                expandBBoxDim(ad->getCenter().X() - r, ad->getCenter().Y() - r);
+                expandBBoxDim(ad->getCenter().X() + r, ad->getCenter().Y() + r);
             }
         }
         else if (dim->getType() == CADEngine::DimensionType::Radial) {
             auto rd = std::dynamic_pointer_cast<CADEngine::RadialDimension>(dim);
             if (rd) {
-                expandBBox(rd->getCenter().X(), rd->getCenter().Y());
-                expandBBox(rd->getArrowPoint().X(), rd->getArrowPoint().Y());
+                expandBBoxDim(rd->getCenter().X(), rd->getCenter().Y());
+                expandBBoxDim(rd->getArrowPoint().X(), rd->getArrowPoint().Y());
             }
         }
     }
@@ -4309,94 +4321,136 @@ void MainWindow::onExportSketchPDF(std::shared_ptr<CADEngine::SketchFeature> ske
         return;
     }
     
-    // Marge autour du dessin (en mm du sketch)
-    double sketchMargin = std::max(maxX - minX, maxY - minY) * 0.12;
-    minX -= sketchMargin;
-    minY -= sketchMargin;
-    maxX += sketchMargin;
-    maxY += sketchMargin;
-    
-    double sketchW = maxX - minX;
-    double sketchH = maxY - minY;
-    
-    // === Créer le PDF avec QPdfWriter ===
+    // === Sélection du format paysage — toujours paysage, sens de la longueur ===
+    const double margin_mm   = 10.0;   // marge page (titre+cartouche inclus dedans)
+    const double titleH_mm   =  8.0;
+    const double cartH_mm    =  9.0;
+    const double reserved_mm = titleH_mm + cartH_mm;  // 17mm
+
+    // Bbox entités pures (keyPoints)
+    double eMinX = 1e18, eMinY = 1e18, eMaxX = -1e18, eMaxY = -1e18;
+    for (const auto& [kx, ky] : keyPoints) {
+        if (kx < eMinX) eMinX = kx;  if (kx > eMaxX) eMaxX = kx;
+        if (ky < eMinY) eMinY = ky;  if (ky > eMaxY) eMaxY = ky;
+    }
+    double sketchW = eMaxX - eMinX;
+    double sketchH = eMaxY - eMinY;
+
+    // Toujours dans le sens de la longueur : plus grande dimension = horizontale
+    bool swap90 = (sketchH > sketchW);
+    double drawW = swap90 ? sketchH : sketchW;  // dim horizontale sur la page
+    double drawH = swap90 ? sketchW : sketchH;  // dim verticale sur la page
+
+    struct PageFmt { QString name; QPageSize::PageSizeId sizeId; double small, large; };
+    const PageFmt formats[] = {
+        {"A4", QPageSize::A4, 210.0, 297.0},
+        {"A3", QPageSize::A3, 297.0, 420.0},
+        {"A2", QPageSize::A2, 420.0, 594.0},
+        {"A1", QPageSize::A1, 594.0, 841.0},
+        {"A0", QPageSize::A0, 841.0, 1189.0},
+    };
+
+    QString chosenName;
+    QPageSize::PageSizeId chosenSizeId = QPageSize::A0;
+    bool   fitsExact    = false;
+    double appliedScale = 1.0;
+
+    for (const auto& fmt : formats) {
+        // Paysage uniquement : grand côté = largeur, petit côté = hauteur
+        double avW = fmt.large - 2*margin_mm;
+        double avH = fmt.small - 2*margin_mm - reserved_mm;
+        if (drawW <= avW && drawH <= avH) {
+            chosenName  = fmt.name + " Paysage";
+            chosenSizeId = fmt.sizeId;
+            fitsExact   = true;
+            break;
+        }
+    }
+
+    // Fallback : trop grand → A0 paysage avec réduction
+    if (!fitsExact) {
+        double avW = 1189.0 - 2*margin_mm;
+        double avH =  841.0 - 2*margin_mm - reserved_mm;
+        appliedScale = std::min(avW / drawW, avH / drawH);
+        chosenName  = "A0 Paysage";
+        chosenSizeId = QPageSize::A0;
+    }
+
+    // === Créer le PDF (toujours paysage) ===
     QPdfWriter pdfWriter(fileName);
-    pdfWriter.setPageSize(QPageSize(QPageSize::A4));
-    
-    // Choisir orientation selon le rapport d'aspect
-    if (sketchW > sketchH)
-        pdfWriter.setPageOrientation(QPageLayout::Landscape);
-    else
-        pdfWriter.setPageOrientation(QPageLayout::Portrait);
-    
-    pdfWriter.setPageMargins(QMarginsF(15, 15, 15, 15), QPageLayout::Millimeter);
+    pdfWriter.setPageSize(QPageSize(chosenSizeId));
+    pdfWriter.setPageOrientation(QPageLayout::Landscape);
+    pdfWriter.setPageMargins(QMarginsF(margin_mm, margin_mm, margin_mm, margin_mm), QPageLayout::Millimeter);
     pdfWriter.setResolution(300);
     pdfWriter.setTitle(QString::fromStdString(sketch->getName()));
-    pdfWriter.setCreator("CAD-ENGINE v0.8");
-    
+    pdfWriter.setCreator("CAD-ENGINE v1.0");
+
     QPainter painter(&pdfWriter);
     if (!painter.isActive()) {
         QMessageBox::warning(this, "Erreur", "Impossible de créer le fichier PDF.");
         return;
     }
-    
     painter.setRenderHint(QPainter::Antialiasing, true);
-    
-    // Zone de dessin disponible (en pixels à 300dpi)
+
+    double pxPerMm = pdfWriter.resolution() / 25.4;
+    double scale   = pxPerMm * appliedScale;
+
     QRectF pageRect = painter.viewport();
     double pageW = pageRect.width();
     double pageH = pageRect.height();
-    
-    // Réserver espace en haut pour le titre et en bas pour le cartouche
-    double titleH = pageH * 0.06;
-    double cartoucheH = pageH * 0.05;
-    double drawAreaH = pageH - titleH - cartoucheH;
-    double drawAreaW = pageW;
+
+    double titleH      = titleH_mm * pxPerMm;
+    double cartoucheH  = cartH_mm  * pxPerMm;
+    double drawAreaH   = pageH - titleH - cartoucheH;
+    double drawAreaW   = pageW;
     double drawAreaTop = titleH;
-    
-    // === Titre ===
+
+    // === Titre compact ===
     {
-        QFont titleFont("Helvetica", 14, QFont::Bold);
-        // Ajuster la taille en pixels pour le DPI du PDF
-        titleFont.setPixelSize((int)(titleH * 0.45));
+        QFont titleFont("Helvetica", 11, QFont::Bold);
+        titleFont.setPixelSize((int)(titleH * 0.75));
         painter.setFont(titleFont);
         painter.setPen(QPen(Qt::black, 2));
-        painter.drawText(QRectF(0, 0, pageW, titleH),
-                         Qt::AlignCenter,
+        painter.drawText(QRectF(0, 0, pageW, titleH), Qt::AlignCenter,
                          QString::fromStdString(sketch->getName()));
-        
-        // Ligne séparatrice
-        painter.setPen(QPen(Qt::darkGray, 3));
-        painter.drawLine(QPointF(pageW * 0.05, titleH - 5),
-                         QPointF(pageW * 0.95, titleH - 5));
+        painter.setPen(QPen(Qt::darkGray, 2));
+        painter.drawLine(QPointF(0, titleH), QPointF(pageW, titleH));
     }
-    
-    // === Calcul du facteur d'échelle ===
-    double scaleX = drawAreaW / sketchW;
-    double scaleY = drawAreaH / sketchH;
-    double scale = std::min(scaleX, scaleY) * 0.92;  // 92% pour marge interne
-    
-    // Offset pour centrer
-    double offsetX = (drawAreaW - sketchW * scale) / 2.0;
-    double offsetY = (drawAreaH - sketchH * scale) / 2.0;
-    
-    // Lambda: convertir coordonnées sketch → page PDF
-    // Note: Y inversé car QPainter a Y vers le bas
+
+    // Clip : empêche tout débordement sur titre et cartouche
+    painter.setClipRect(QRectF(0, drawAreaTop, drawAreaW, drawAreaH));
+
+    // Centrage sur la zone de dessin
+    double offsetX = (drawAreaW - drawW * scale) / 2.0;
+    double offsetY = (drawAreaH - drawH * scale) / 2.0;
+    if (offsetX < 0) offsetX = 0;
+    if (offsetY < 0) offsetY = 0;
+
+    // Lambda: sketch → PDF avec rotation 90° si nécessaire (Y inversé)
+    // swap90=false : sketch portrait/carré → rx=sx-eMinX, ry=sy-eMinY
+    // swap90=true  : sketch portrait → rotation 90° CW → drawW=sketchH, drawH=sketchW
     auto toPage = [&](double sx, double sy) -> QPointF {
-        double px = (sx - minX) * scale + offsetX;
-        double py = drawAreaTop + drawAreaH - ((sy - minY) * scale + offsetY);
-        return QPointF(px, py);
+        double rx, ry;
+        if (swap90) {
+            rx = sy - eMinY;        // axe Y sketch → axe X page
+            ry = eMaxX - sx;        // axe X sketch inversé → axe Y page
+        } else {
+            rx = sx - eMinX;
+            ry = sy - eMinY;
+        }
+        return QPointF(rx * scale + offsetX,
+                       drawAreaTop + drawAreaH - (ry * scale + offsetY));
     };
-    
-    // === Épaisseurs et styles ===
-    double entityLineW = std::max(3.0, scale * 0.15);
-    double dimLineW = std::max(1.5, entityLineW * 0.5);
-    double arrowSize = std::max(scale * 1.5, 15.0);
-    double crossSize = std::max(scale * 2.0, 10.0);
-    
+
+    // === Épaisseurs (en mm, fixes pour gabarit 1:1) ===
+    double entityLineW = 0.35 * pxPerMm;
+    double dimLineW    = 0.18 * pxPerMm;
+    double arrowSize   = 3.5  * pxPerMm * appliedScale;
+    double crossSize   = 3.0  * pxPerMm * appliedScale;
+
     QFont dimFont("Helvetica", 9);
-    dimFont.setPixelSize((int)std::max(arrowSize * 1.8, 28.0));
-    
+    dimFont.setPixelSize((int)(3.5 * pxPerMm * appliedScale));
+
     QPen entityPen(Qt::black, entityLineW, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
     QPen dimPen(QColor(0, 100, 200), dimLineW, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
     QPen extLinePen(QColor(0, 100, 200), dimLineW * 0.7, Qt::DashLine, Qt::RoundCap);
@@ -4843,36 +4897,363 @@ void MainWindow::onExportSketchPDF(std::shared_ptr<CADEngine::SketchFeature> ske
     }
     
     // === CARTOUCHE en bas ===
+    painter.setClipping(false);
     {
-        painter.setPen(QPen(Qt::darkGray, 3));
         double cartoucheTop = pageH - cartoucheH;
-        painter.drawLine(QPointF(pageW * 0.05, cartoucheTop + 5),
-                         QPointF(pageW * 0.95, cartoucheTop + 5));
-        
-        QFont smallFont("Helvetica", 8);
-        smallFont.setPixelSize((int)(cartoucheH * 0.35));
-        painter.setFont(smallFont);
-        painter.setPen(Qt::darkGray);
-        
-        int entityCount = (int)sketch2D->getEntities().size();
-        int dimCount = (int)sketch2D->getDimensions().size();
+
+        // Cadre du cartouche
+        painter.setPen(QPen(Qt::darkGray, 3));
+        painter.drawLine(QPointF(pageW * 0.02, cartoucheTop + 4),
+                         QPointF(pageW * 0.98, cartoucheTop + 4));
+        painter.drawRect(QRectF(pageW * 0.02, cartoucheTop + 4,
+                                pageW * 0.96, cartoucheH - 8));
+
+        // Ligne verticale centrale (séparation gauche/droite)
+        double midX = pageW * 0.02 + pageW * 0.96 * 0.55;
+        painter.drawLine(QPointF(midX, cartoucheTop + 4),
+                         QPointF(midX, cartoucheTop + cartoucheH - 4));
+
+        painter.setPen(Qt::black);
+
+        // === Colonne gauche : format + échelle (info impression) ===
+        QString echelleStr;
+        if (fitsExact) {
+            echelleStr = "ECHELLE  1 : 1";
+        } else {
+            int den = (int)(1.0 / appliedScale + 0.5);
+            echelleStr = QString("ECHELLE  1 : %1  (trop grand pour A0)").arg(den);
+        }
+
+        QFont bigFont("Helvetica", 12, QFont::Bold);
+        bigFont.setPixelSize((int)(cartoucheH * 0.38));
+        painter.setFont(bigFont);
+        painter.drawText(QRectF(pageW * 0.03, cartoucheTop + 6,
+                                midX - pageW * 0.04, (cartoucheH - 10) * 0.50),
+                         Qt::AlignLeft | Qt::AlignVCenter,
+                         QString("Format : %1").arg(chosenName));
+
+        QFont echelleFont("Helvetica", 12, QFont::Bold);
+        echelleFont.setPixelSize((int)(cartoucheH * 0.42));
+        painter.setFont(echelleFont);
+        painter.drawText(QRectF(pageW * 0.03, cartoucheTop + 6 + (cartoucheH - 10) * 0.50,
+                                midX - pageW * 0.04, (cartoucheH - 10) * 0.50),
+                         Qt::AlignLeft | Qt::AlignVCenter,
+                         echelleStr);
+
+        // === Colonne droite : infos techniques ===
+        int entityCount  = 0;
+        for (const auto& e : sketch2D->getEntities())
+            if (!e->isConstruction()) entityCount++;
+        int dimCount     = (int)sketch2D->getDimensions().size();
         int autoDimCount = (int)sketch2D->getAutoDimensions().size();
-        
-        QString info = QString("CAD-ENGINE v0.8  |  %1  |  %2 entités  |  %3 cotations + %4 auto  |  Unités: mm")
-            .arg(QString::fromStdString(sketch->getName()))
-            .arg(entityCount)
-            .arg(dimCount)
-            .arg(autoDimCount);
-        
-        painter.drawText(QRectF(0, cartoucheTop + 5, pageW, cartoucheH - 5),
-                         Qt::AlignCenter, info);
+        // Dimensions réelles du sketch (sans la marge de confort)
+        double realSketchW = sketchW;
+        double realSketchH = sketchH;
+
+        QFont smallFont("Helvetica", 8);
+        smallFont.setPixelSize((int)(cartoucheH * 0.30));
+        painter.setFont(smallFont);
+
+        QString line1 = QString("CAD-ENGINE v1.0  |  Unités : mm  |  %1 entités  |  %2 cot. manuelles + %3 auto")
+            .arg(entityCount).arg(dimCount).arg(autoDimCount);
+        QString line2 = QString("Dimensions du sketch : %1 mm  ×  %2 mm")
+            .arg(realSketchW, 0, 'f', 1)
+            .arg(realSketchH, 0, 'f', 1);
+
+        double rightW = pageW * 0.98 - midX - pageW * 0.01;
+        painter.drawText(QRectF(midX + pageW * 0.01, cartoucheTop + 6,
+                                rightW, (cartoucheH - 10) * 0.50),
+                         Qt::AlignLeft | Qt::AlignVCenter, line1);
+        painter.drawText(QRectF(midX + pageW * 0.01,
+                                cartoucheTop + 6 + (cartoucheH - 10) * 0.50,
+                                rightW, (cartoucheH - 10) * 0.50),
+                         Qt::AlignLeft | Qt::AlignVCenter, line2);
     }
     
     painter.end();
     
     m_statusLabel->setText(QString("Sketch exporté en PDF: %1").arg(fileName));
     QMessageBox::information(this, "Export réussi",
-        QString("Le sketch a été exporté en PDF :\n%1").arg(fileName));
+        QString("Le sketch a été exporté en PDF 1:1 :\n%1").arg(fileName));
+}
+
+// ============================================================================
+// Export Sketch en Plan PDF (format + orientation au choix, adapté à la page)
+// ============================================================================
+
+void MainWindow::onExportSketchPlan(std::shared_ptr<CADEngine::SketchFeature> sketch) {
+    if (!sketch) return;
+    auto sketch2D = sketch->getSketch2D();
+    if (!sketch2D) return;
+
+    // --- Boîte de dialogue : format + orientation ---
+    QDialog dlg(this);
+    dlg.setWindowTitle("Exporter en Plan");
+    dlg.setFixedWidth(320);
+    auto* lay = new QVBoxLayout(&dlg);
+
+    auto* fmtLabel = new QLabel("Format :", &dlg);
+    auto* fmtCombo = new QComboBox(&dlg);
+    fmtCombo->addItems({"A4", "A3", "A2", "A1", "A0"});
+    fmtCombo->setCurrentIndex(1);  // A3 par défaut
+
+    auto* oriLabel = new QLabel("Orientation :", &dlg);
+    auto* oriCombo = new QComboBox(&dlg);
+    oriCombo->addItems({"Paysage", "Portrait"});
+
+    auto* btns = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dlg);
+    connect(btns, &QDialogButtonBox::accepted, &dlg, &QDialog::accept);
+    connect(btns, &QDialogButtonBox::rejected, &dlg, &QDialog::reject);
+
+    lay->addWidget(fmtLabel);  lay->addWidget(fmtCombo);
+    lay->addWidget(oriLabel);  lay->addWidget(oriCombo);
+    lay->addWidget(btns);
+
+    if (dlg.exec() != QDialog::Accepted) return;
+
+    // --- Paramètres choisis ---
+    struct FmtDef { QPageSize::PageSizeId id; double w, h; };
+    const FmtDef defs[] = {
+        {QPageSize::A4, 210.0, 297.0},
+        {QPageSize::A3, 297.0, 420.0},
+        {QPageSize::A2, 420.0, 594.0},
+        {QPageSize::A1, 594.0, 841.0},
+        {QPageSize::A0, 841.0, 1189.0},
+    };
+    int fi = fmtCombo->currentIndex();
+    bool landscape = (oriCombo->currentIndex() == 0);
+    QPageSize::PageSizeId pageId = defs[fi].id;
+    QString fmtName = fmtCombo->currentText() + (landscape ? " Paysage" : " Portrait");
+    QPageLayout::Orientation pageOri = landscape ? QPageLayout::Landscape : QPageLayout::Portrait;
+
+    // Dimensions utilisables (mm) après marges 15mm + titre 12mm + cartouche 15mm
+    double pageW_mm = landscape ? defs[fi].h : defs[fi].w;
+    double pageH_mm = landscape ? defs[fi].w : defs[fi].h;
+    const double margin_mm = 15.0, titleH_mm = 12.0, cartH_mm = 15.0;
+    double avW = pageW_mm - 2*margin_mm;
+    double avH = pageH_mm - 2*margin_mm - titleH_mm - cartH_mm;
+
+    // --- Fichier de sortie ---
+    QString fileName = QFileDialog::getSaveFileName(
+        this, "Exporter le Plan en PDF",
+        QString::fromStdString(sketch->getName()) + "_plan.pdf",
+        "Fichiers PDF (*.pdf)");
+    if (fileName.isEmpty()) return;
+
+    // --- Bbox du sketch complet (entités + cotations) ---
+    double minX = 1e18, minY = 1e18, maxX = -1e18, maxY = -1e18;
+    auto expand = [&](double x, double y) {
+        if (x < minX) minX = x;  if (x > maxX) maxX = x;
+        if (y < minY) minY = y;  if (y > maxY) maxY = y;
+    };
+    for (const auto& entity : sketch2D->getEntities()) {
+        if (entity->isConstruction()) continue;
+        for (const auto& pt : entity->getKeyPoints())
+            expand(pt.X(), pt.Y());
+    }
+    sketch2D->regenerateAutoDimensions();
+    for (const auto& dim : sketch2D->getDimensions())
+        expand(dim->getTextPosition().X(), dim->getTextPosition().Y());
+    for (const auto& dim : sketch2D->getAutoDimensions())
+        expand(dim->getTextPosition().X(), dim->getTextPosition().Y());
+
+    if (minX >= maxX || minY >= maxY) {
+        QMessageBox::warning(this, "Erreur", "Le sketch est vide.");
+        return;
+    }
+
+    // Marge visuelle 5%
+    double marg = std::max(maxX - minX, maxY - minY) * 0.05;
+    minX -= marg; minY -= marg; maxX += marg; maxY += marg;
+    double skW = maxX - minX, skH = maxY - minY;
+
+    // --- Créer le PDF ---
+    QPdfWriter pdfWriter(fileName);
+    pdfWriter.setPageSize(QPageSize(pageId));
+    pdfWriter.setPageOrientation(pageOri);
+    pdfWriter.setPageMargins(QMarginsF(margin_mm, margin_mm, margin_mm, margin_mm), QPageLayout::Millimeter);
+    pdfWriter.setResolution(300);
+    pdfWriter.setTitle(QString::fromStdString(sketch->getName()));
+    pdfWriter.setCreator("CAD-ENGINE v1.0");
+
+    QPainter painter(&pdfWriter);
+    if (!painter.isActive()) {
+        QMessageBox::warning(this, "Erreur", "Impossible de créer le fichier PDF.");
+        return;
+    }
+    painter.setRenderHint(QPainter::Antialiasing, true);
+
+    double pxPerMm = pdfWriter.resolution() / 25.4;
+    QRectF pageRect = painter.viewport();
+    double pageW = pageRect.width(), pageH = pageRect.height();
+    double titleH  = titleH_mm * pxPerMm;
+    double cartH   = cartH_mm  * pxPerMm;
+    double drawAreaH  = pageH - titleH - cartH;
+    double drawAreaW  = pageW;
+    double drawAreaTop = titleH;
+
+    // Échelle pour faire tenir le sketch dans la zone de dessin
+    double scaleX = drawAreaW / skW;
+    double scaleY = drawAreaH / skH;
+    double scale  = std::min(scaleX, scaleY) * 0.95;
+
+    // Centrage
+    double offsetX = (drawAreaW - skW * scale) / 2.0;
+    double offsetY = (drawAreaH - skH * scale) / 2.0;
+
+    auto toPage = [&](double sx, double sy) -> QPointF {
+        return QPointF((sx - minX) * scale + offsetX,
+                       drawAreaTop + drawAreaH - ((sy - minY) * scale + offsetY));
+    };
+
+    // Calcul de l'échelle effective en mm
+    double scaleNum = 1.0, scaleDen = 1.0;
+    if (scale < pxPerMm) {
+        scaleDen = std::round(pxPerMm / scale);
+        if (scaleDen < 1) scaleDen = 1;
+    }
+    QString echelleStr = (scaleDen <= 1.0)
+        ? "Echelle 1:1"
+        : QString("Echelle 1:%1").arg((int)scaleDen);
+
+    // --- Titre ---
+    {
+        QFont tf("Helvetica", 14, QFont::Bold);
+        tf.setPixelSize((int)(titleH * 0.45));
+        painter.setFont(tf);
+        painter.setPen(QPen(Qt::black, 2));
+        painter.drawText(QRectF(0, 0, pageW, titleH), Qt::AlignCenter,
+                         QString::fromStdString(sketch->getName()));
+        painter.setPen(QPen(Qt::darkGray, 3));
+        painter.drawLine(QPointF(pageW*0.05, titleH-5), QPointF(pageW*0.95, titleH-5));
+    }
+
+    painter.setClipRect(QRectF(0, drawAreaTop, drawAreaW, drawAreaH));
+
+    // Épaisseurs
+    double elw = std::max(2.0, scale * 0.15);
+    double dlw = std::max(1.0, elw * 0.5);
+    double arrowSz = std::max(scale * 1.5, 12.0);
+    double crossSz = std::max(scale * 2.0, 8.0);
+    QFont dimFont("Helvetica", 9);
+    dimFont.setPixelSize((int)std::max(arrowSz * 1.8, 22.0));
+    QPen entityPen(Qt::black,           elw, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+    QPen dimPen(QColor(0,100,200),      dlw, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin);
+    QPen extLinePen(QColor(0,100,200),  dlw*0.7, Qt::DashLine, Qt::RoundCap);
+    QPen centerPen(QColor(120,120,120), dlw*0.5, Qt::DashDotLine);
+
+    // --- Dessin des entités (même code que real-size) ---
+    painter.setPen(entityPen);
+    painter.setBrush(Qt::NoBrush);
+    for (const auto& entity : sketch2D->getEntities()) {
+        if (entity->isConstruction()) continue;
+        if (entity->getType() == CADEngine::SketchEntityType::Line) {
+            auto line = std::dynamic_pointer_cast<CADEngine::SketchLine>(entity);
+            if (line) painter.drawLine(toPage(line->getStart().X(), line->getStart().Y()),
+                                       toPage(line->getEnd().X(),   line->getEnd().Y()));
+        } else if (entity->getType() == CADEngine::SketchEntityType::Circle) {
+            auto circle = std::dynamic_pointer_cast<CADEngine::SketchCircle>(entity);
+            if (circle) {
+                QPointF c = toPage(circle->getCenter().X(), circle->getCenter().Y());
+                double r = circle->getRadius() * scale;
+                painter.drawEllipse(c, r, r);
+                painter.setPen(centerPen);
+                painter.drawLine(QPointF(c.x()-crossSz,c.y()), QPointF(c.x()+crossSz,c.y()));
+                painter.drawLine(QPointF(c.x(),c.y()-crossSz), QPointF(c.x(),c.y()+crossSz));
+                painter.setPen(entityPen);
+            }
+        } else if (entity->getType() == CADEngine::SketchEntityType::Arc) {
+            auto arc = std::dynamic_pointer_cast<CADEngine::SketchArc>(entity);
+            if (arc) {
+                gp_Pnt2d p1=arc->getStart(), p2=arc->getMid(), p3=arc->getEnd();
+                if (arc->isBezier()) {
+                    QPainterPath path;
+                    path.moveTo(toPage(p1.X(),p1.Y()));
+                    path.quadTo(toPage(p2.X(),p2.Y()), toPage(p3.X(),p3.Y()));
+                    painter.drawPath(path);
+                } else {
+                    double ax=p2.X()-p1.X(), ay=p2.Y()-p1.Y();
+                    double bx=p3.X()-p2.X(), by=p3.Y()-p2.Y();
+                    double det=2.0*(ax*by-ay*bx);
+                    if (std::abs(det)>1e-6) {
+                        double am=ax*ax+ay*ay, bm=bx*bx+by*by;
+                        double cx=p1.X()+(am*by-bm*ay)/det, cy=p1.Y()+(bm*ax-am*bx)/det;
+                        double rad=std::sqrt((p1.X()-cx)*(p1.X()-cx)+(p1.Y()-cy)*(p1.Y()-cy));
+                        double a1=std::atan2(p1.Y()-cy,p1.X()-cx);
+                        double a2=std::atan2(p2.Y()-cy,p2.X()-cx);
+                        double a3=std::atan2(p3.Y()-cy,p3.X()-cx);
+                        double sw13=a3-a1; while(sw13<-M_PI)sw13+=2*M_PI; while(sw13>M_PI)sw13-=2*M_PI;
+                        double sw12=a2-a1; while(sw12<-M_PI)sw12+=2*M_PI; while(sw12>M_PI)sw12-=2*M_PI;
+                        double sw=((sw13>0&&sw12>0&&sw12<sw13)||(sw13<0&&sw12<0&&sw12>sw13))?sw13:((sw13>0)?sw13-2*M_PI:sw13+2*M_PI);
+                        int seg=std::max(32,(int)(std::abs(sw)*64.0/M_PI));
+                        QVector<QPointF> pts;
+                        for(int i=0;i<=seg;++i){ double a=a1+sw*i/seg; pts<<toPage(cx+rad*std::cos(a),cy+rad*std::sin(a)); }
+                        painter.drawPolyline(pts.data(),pts.size());
+                    }
+                }
+            }
+        } else if (entity->getType() == CADEngine::SketchEntityType::Rectangle) {
+            auto rect = std::dynamic_pointer_cast<CADEngine::SketchRectangle>(entity);
+            if (rect) {
+                auto c = rect->getKeyPoints(); QPolygonF poly;
+                for (const auto& p : c) poly << toPage(p.X(),p.Y());
+                poly << poly.first(); painter.drawPolygon(poly);
+            }
+        } else if (entity->getType() == CADEngine::SketchEntityType::Polyline) {
+            auto pl = std::dynamic_pointer_cast<CADEngine::SketchPolyline>(entity);
+            if (pl) { QVector<QPointF> pts; for(const auto& p:pl->getPoints()) pts<<toPage(p.X(),p.Y()); painter.drawPolyline(pts.data(),pts.size()); }
+        }
+    }
+
+    // --- Cotations (même logique que real-size, simplifiée) ---
+    auto allDims = sketch2D->getDimensions();
+    auto autoDims = sketch2D->getAutoDimensions();
+    allDims.insert(allDims.end(), autoDims.begin(), autoDims.end());
+
+    painter.setFont(dimFont);
+    for (const auto& dim : allDims) {
+        if (dim->getType() == CADEngine::DimensionType::Linear) {
+            auto ld = std::dynamic_pointer_cast<CADEngine::LinearDimension>(dim);
+            if (!ld) continue;
+            QPointF p1 = toPage(ld->getDimensionLineStart().X(), ld->getDimensionLineStart().Y());
+            QPointF p2 = toPage(ld->getDimensionLineEnd().X(),   ld->getDimensionLineEnd().Y());
+            QPointF tp = toPage(ld->getTextPosition().X(),       ld->getTextPosition().Y());
+            painter.setPen(dimPen);
+            painter.drawLine(p1, p2);
+            painter.drawText(tp, QString::fromStdString(ld->getText()));
+        }
+    }
+
+    painter.setClipping(false);
+
+    // --- Cartouche ---
+    {
+        double cartTop = pageH - cartH;
+        painter.setPen(QPen(Qt::darkGray, 3));
+        painter.drawLine(QPointF(pageW*0.02, cartTop+4), QPointF(pageW*0.98, cartTop+4));
+        painter.drawRect(QRectF(pageW*0.02, cartTop+4, pageW*0.96, cartH-8));
+        double midX = pageW*0.02 + pageW*0.96*0.55;
+        painter.drawLine(QPointF(midX, cartTop+4), QPointF(midX, cartTop+cartH-4));
+        painter.setPen(Qt::black);
+        QFont bf("Helvetica",12,QFont::Bold); bf.setPixelSize((int)(cartH*0.38)); painter.setFont(bf);
+        painter.drawText(QRectF(pageW*0.03, cartTop+6, midX-pageW*0.04, (cartH-10)*0.5),
+                         Qt::AlignLeft|Qt::AlignVCenter, QString("Format : %1").arg(fmtName));
+        QFont ef("Helvetica",12,QFont::Bold); ef.setPixelSize((int)(cartH*0.42)); painter.setFont(ef);
+        painter.drawText(QRectF(pageW*0.03, cartTop+6+(cartH-10)*0.5, midX-pageW*0.04, (cartH-10)*0.5),
+                         Qt::AlignLeft|Qt::AlignVCenter, echelleStr);
+        QFont sf("Helvetica",8); sf.setPixelSize((int)(cartH*0.30)); painter.setFont(sf);
+        painter.drawText(QRectF(midX+pageW*0.01, cartTop+6, pageW*0.98-midX-pageW*0.01, (cartH-10)*0.5),
+                         Qt::AlignLeft|Qt::AlignVCenter,
+                         QString("CAD-ENGINE v1.0  |  Unités : mm  |  %1").arg(QString::fromStdString(sketch->getName())));
+        painter.drawText(QRectF(midX+pageW*0.01, cartTop+6+(cartH-10)*0.5, pageW*0.98-midX-pageW*0.01, (cartH-10)*0.5),
+                         Qt::AlignLeft|Qt::AlignVCenter,
+                         QString("Dimensions : %1 x %2 mm").arg(skW-2*marg,0,'f',1).arg(skH-2*marg,0,'f',1));
+    }
+
+    painter.end();
+    m_statusLabel->setText(QString("Plan exporté: %1").arg(fileName));
+    QMessageBox::information(this, "Export réussi",
+        QString("Le plan a été exporté en PDF :\n%1").arg(fileName));
 }
 
 // ============================================================================

@@ -103,7 +103,8 @@ template <> constexpr inline auto MainWindow::qt_create_metaobjectdata<qt_meta_t
         "onFeatureDeleted",
         "onExportSketchDXF",
         "std::shared_ptr<CADEngine::SketchFeature>",
-        "onExportSketchPDF",
+        "onExportSketchRealSizePDF",
+        "onExportSketchPlan",
         "onDeleteEntity",
         "onDeleteDimension",
         "onDeletePolylineSegment",
@@ -255,62 +256,66 @@ template <> constexpr inline auto MainWindow::qt_create_metaobjectdata<qt_meta_t
         QtMocHelpers::SlotData<void(std::shared_ptr<CADEngine::SketchFeature>)>(62, 2, QMC::AccessPrivate, QMetaType::Void, {{
             { 0x80000000 | 63, 47 },
         }}),
-        // Slot 'onExportSketchPDF'
+        // Slot 'onExportSketchRealSizePDF'
         QtMocHelpers::SlotData<void(std::shared_ptr<CADEngine::SketchFeature>)>(64, 2, QMC::AccessPrivate, QMetaType::Void, {{
             { 0x80000000 | 63, 47 },
         }}),
+        // Slot 'onExportSketchPlan'
+        QtMocHelpers::SlotData<void(std::shared_ptr<CADEngine::SketchFeature>)>(65, 2, QMC::AccessPrivate, QMetaType::Void, {{
+            { 0x80000000 | 63, 47 },
+        }}),
         // Slot 'onDeleteEntity'
-        QtMocHelpers::SlotData<void()>(65, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onDeleteDimension'
         QtMocHelpers::SlotData<void()>(66, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'onDeleteDimension'
+        QtMocHelpers::SlotData<void()>(67, 2, QMC::AccessPrivate, QMetaType::Void),
         // Slot 'onDeletePolylineSegment'
-        QtMocHelpers::SlotData<void(int)>(67, 2, QMC::AccessPrivate, QMetaType::Void, {{
-            { QMetaType::Int, 68 },
+        QtMocHelpers::SlotData<void(int)>(68, 2, QMC::AccessPrivate, QMetaType::Void, {{
+            { QMetaType::Int, 69 },
         }}),
         // Slot 'refreshAllAngularDimensions'
-        QtMocHelpers::SlotData<void()>(69, 2, QMC::AccessPrivate, QMetaType::Void),
+        QtMocHelpers::SlotData<void()>(70, 2, QMC::AccessPrivate, QMetaType::Void),
         // Slot 'onFilletVertex'
-        QtMocHelpers::SlotData<void(std::shared_ptr<CADEngine::SketchPolyline>, int)>(70, 2, QMC::AccessPrivate, QMetaType::Void, {{
-            { 0x80000000 | 71, 72 }, { QMetaType::Int, 73 },
+        QtMocHelpers::SlotData<void(std::shared_ptr<CADEngine::SketchPolyline>, int)>(71, 2, QMC::AccessPrivate, QMetaType::Void, {{
+            { 0x80000000 | 72, 73 }, { QMetaType::Int, 74 },
         }}),
         // Slot 'onFilletRectCorner'
-        QtMocHelpers::SlotData<void(std::shared_ptr<CADEngine::SketchRectangle>, int)>(74, 2, QMC::AccessPrivate, QMetaType::Void, {{
-            { 0x80000000 | 75, 76 }, { QMetaType::Int, 77 },
+        QtMocHelpers::SlotData<void(std::shared_ptr<CADEngine::SketchRectangle>, int)>(75, 2, QMC::AccessPrivate, QMetaType::Void, {{
+            { 0x80000000 | 76, 77 }, { QMetaType::Int, 78 },
         }}),
         // Slot 'onFilletLineCorner'
-        QtMocHelpers::SlotData<void(std::shared_ptr<CADEngine::SketchLine>, bool, std::shared_ptr<CADEngine::SketchLine>, bool)>(78, 2, QMC::AccessPrivate, QMetaType::Void, {{
-            { 0x80000000 | 79, 80 }, { QMetaType::Bool, 81 }, { 0x80000000 | 79, 82 }, { QMetaType::Bool, 83 },
+        QtMocHelpers::SlotData<void(std::shared_ptr<CADEngine::SketchLine>, bool, std::shared_ptr<CADEngine::SketchLine>, bool)>(79, 2, QMC::AccessPrivate, QMetaType::Void, {{
+            { 0x80000000 | 80, 81 }, { QMetaType::Bool, 82 }, { 0x80000000 | 80, 83 }, { QMetaType::Bool, 84 },
         }}),
         // Slot 'onConstraintHorizontal'
-        QtMocHelpers::SlotData<void()>(84, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onConstraintVertical'
         QtMocHelpers::SlotData<void()>(85, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onConstraintParallel'
+        // Slot 'onConstraintVertical'
         QtMocHelpers::SlotData<void()>(86, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onConstraintPerpendicular'
+        // Slot 'onConstraintParallel'
         QtMocHelpers::SlotData<void()>(87, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onConstraintCoincident'
+        // Slot 'onConstraintPerpendicular'
         QtMocHelpers::SlotData<void()>(88, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onConstraintConcentric'
+        // Slot 'onConstraintCoincident'
         QtMocHelpers::SlotData<void()>(89, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onConstraintSymmetric'
+        // Slot 'onConstraintConcentric'
         QtMocHelpers::SlotData<void()>(90, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onConstraintFix'
+        // Slot 'onConstraintSymmetric'
         QtMocHelpers::SlotData<void()>(91, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onFillet'
+        // Slot 'onConstraintFix'
         QtMocHelpers::SlotData<void()>(92, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onUndo'
+        // Slot 'onFillet'
         QtMocHelpers::SlotData<void()>(93, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onRedo'
+        // Slot 'onUndo'
         QtMocHelpers::SlotData<void()>(94, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'onThemeCycle'
+        // Slot 'onRedo'
         QtMocHelpers::SlotData<void()>(95, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'refreshIcons'
+        // Slot 'onThemeCycle'
         QtMocHelpers::SlotData<void()>(96, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'showHelpSketch'
+        // Slot 'refreshIcons'
         QtMocHelpers::SlotData<void()>(97, 2, QMC::AccessPrivate, QMetaType::Void),
-        // Slot 'showHelpViewport'
+        // Slot 'showHelpSketch'
         QtMocHelpers::SlotData<void()>(98, 2, QMC::AccessPrivate, QMetaType::Void),
+        // Slot 'showHelpViewport'
+        QtMocHelpers::SlotData<void()>(99, 2, QMC::AccessPrivate, QMetaType::Void),
     };
     QtMocHelpers::UintData qt_properties {
     };
@@ -380,29 +385,30 @@ void MainWindow::qt_static_metacall(QObject *_o, QMetaObject::Call _c, int _id, 
         case 43: _t->onFeatureDoubleClicked((*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::Feature>>>(_a[1]))); break;
         case 44: _t->onFeatureDeleted((*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::Feature>>>(_a[1]))); break;
         case 45: _t->onExportSketchDXF((*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::SketchFeature>>>(_a[1]))); break;
-        case 46: _t->onExportSketchPDF((*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::SketchFeature>>>(_a[1]))); break;
-        case 47: _t->onDeleteEntity(); break;
-        case 48: _t->onDeleteDimension(); break;
-        case 49: _t->onDeletePolylineSegment((*reinterpret_cast<std::add_pointer_t<int>>(_a[1]))); break;
-        case 50: _t->refreshAllAngularDimensions(); break;
-        case 51: _t->onFilletVertex((*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::SketchPolyline>>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<int>>(_a[2]))); break;
-        case 52: _t->onFilletRectCorner((*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::SketchRectangle>>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<int>>(_a[2]))); break;
-        case 53: _t->onFilletLineCorner((*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::SketchLine>>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<bool>>(_a[2])),(*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::SketchLine>>>(_a[3])),(*reinterpret_cast<std::add_pointer_t<bool>>(_a[4]))); break;
-        case 54: _t->onConstraintHorizontal(); break;
-        case 55: _t->onConstraintVertical(); break;
-        case 56: _t->onConstraintParallel(); break;
-        case 57: _t->onConstraintPerpendicular(); break;
-        case 58: _t->onConstraintCoincident(); break;
-        case 59: _t->onConstraintConcentric(); break;
-        case 60: _t->onConstraintSymmetric(); break;
-        case 61: _t->onConstraintFix(); break;
-        case 62: _t->onFillet(); break;
-        case 63: _t->onUndo(); break;
-        case 64: _t->onRedo(); break;
-        case 65: _t->onThemeCycle(); break;
-        case 66: _t->refreshIcons(); break;
-        case 67: _t->showHelpSketch(); break;
-        case 68: _t->showHelpViewport(); break;
+        case 46: _t->onExportSketchRealSizePDF((*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::SketchFeature>>>(_a[1]))); break;
+        case 47: _t->onExportSketchPlan((*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::SketchFeature>>>(_a[1]))); break;
+        case 48: _t->onDeleteEntity(); break;
+        case 49: _t->onDeleteDimension(); break;
+        case 50: _t->onDeletePolylineSegment((*reinterpret_cast<std::add_pointer_t<int>>(_a[1]))); break;
+        case 51: _t->refreshAllAngularDimensions(); break;
+        case 52: _t->onFilletVertex((*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::SketchPolyline>>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<int>>(_a[2]))); break;
+        case 53: _t->onFilletRectCorner((*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::SketchRectangle>>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<int>>(_a[2]))); break;
+        case 54: _t->onFilletLineCorner((*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::SketchLine>>>(_a[1])),(*reinterpret_cast<std::add_pointer_t<bool>>(_a[2])),(*reinterpret_cast<std::add_pointer_t<std::shared_ptr<CADEngine::SketchLine>>>(_a[3])),(*reinterpret_cast<std::add_pointer_t<bool>>(_a[4]))); break;
+        case 55: _t->onConstraintHorizontal(); break;
+        case 56: _t->onConstraintVertical(); break;
+        case 57: _t->onConstraintParallel(); break;
+        case 58: _t->onConstraintPerpendicular(); break;
+        case 59: _t->onConstraintCoincident(); break;
+        case 60: _t->onConstraintConcentric(); break;
+        case 61: _t->onConstraintSymmetric(); break;
+        case 62: _t->onConstraintFix(); break;
+        case 63: _t->onFillet(); break;
+        case 64: _t->onUndo(); break;
+        case 65: _t->onRedo(); break;
+        case 66: _t->onThemeCycle(); break;
+        case 67: _t->refreshIcons(); break;
+        case 68: _t->showHelpSketch(); break;
+        case 69: _t->showHelpViewport(); break;
         default: ;
         }
     }
@@ -427,14 +433,14 @@ int MainWindow::qt_metacall(QMetaObject::Call _c, int _id, void **_a)
     if (_id < 0)
         return _id;
     if (_c == QMetaObject::InvokeMetaMethod) {
-        if (_id < 69)
+        if (_id < 70)
             qt_static_metacall(this, _c, _id, _a);
-        _id -= 69;
+        _id -= 70;
     }
     if (_c == QMetaObject::RegisterMethodArgumentMetaType) {
-        if (_id < 69)
+        if (_id < 70)
             *reinterpret_cast<QMetaType *>(_a[0]) = QMetaType();
-        _id -= 69;
+        _id -= 70;
     }
     return _id;
 }

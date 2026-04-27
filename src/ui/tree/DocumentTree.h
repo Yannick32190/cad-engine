@@ -37,7 +37,8 @@ signals:
     void featureDoubleClicked(std::shared_ptr<CADEngine::Feature> feature);
     void deleteFeatureRequested(std::shared_ptr<CADEngine::Feature> feature);
     void exportSketchDXFRequested(std::shared_ptr<CADEngine::SketchFeature> sketch);
-    void exportSketchPDFRequested(std::shared_ptr<CADEngine::SketchFeature> sketch);
+    void exportSketchRealSizePDFRequested(std::shared_ptr<CADEngine::SketchFeature> sketch);
+    void exportSketchPlanRequested(std::shared_ptr<CADEngine::SketchFeature> sketch);
 
 private slots:
     void onItemClicked(QTreeWidgetItem* item, int column);

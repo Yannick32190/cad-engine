@@ -85,7 +85,8 @@ private slots:
     void onFeatureDoubleClicked(std::shared_ptr<CADEngine::Feature> feature);
     void onFeatureDeleted(std::shared_ptr<CADEngine::Feature> feature);
     void onExportSketchDXF(std::shared_ptr<CADEngine::SketchFeature> sketch);
-    void onExportSketchPDF(std::shared_ptr<CADEngine::SketchFeature> sketch);
+    void onExportSketchRealSizePDF(std::shared_ptr<CADEngine::SketchFeature> sketch);
+    void onExportSketchPlan(std::shared_ptr<CADEngine::SketchFeature> sketch);
     
     // Suppression
     void onDeleteEntity();
